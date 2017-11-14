@@ -36,7 +36,8 @@
                   ;; XXX It is weird that these v are logic variables here
                   (with-vars (v ...)
                     (match a-constraint
-                      ;; XXX But the v are match variables here
+                      ;; XXX But the v are match variables here, we
+                      ;; should really build-in unify
                       [head
                        (cond
                          [guard
@@ -189,6 +190,7 @@
 (define-simple-macro (with-theory x:id . body)
   (parameterize ([current-theory x]) . body))
 
+;; XXX Maybe make these a structure so we cache the result
 (define ground?
   (match-lambda
     [(? var?) #f]
