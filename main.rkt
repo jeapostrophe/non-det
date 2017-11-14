@@ -98,7 +98,7 @@
   ;; disconnected, because they are constraints on free variables
   (hash-empty? (state-goals st)))
 
-(define (solve/tree the-thy st #:done? done? #:path [path #f])
+(define (solve/tree the-thy st #:done? done?)
   (match-define (*theory thy-rules) the-thy)
   (match-define (state-tree active sols) st)
   (printf "ACTIVE ~a // SOLS ~a\n"
@@ -116,7 +116,7 @@
            ;; future
            (done? new-sols)
            (solve/tree the-thy (state-tree new-active new-sols)
-                       #:done? done? #:path (and path (rest path))))]
+                       #:done? done?))]
          [else
           ;; We never finished and now rule applies, so there's no
           ;; work to be done.
@@ -126,8 +126,12 @@
        ;; For each goal, try to advance it
        [(g gc) (in-hash (state-goals s))]
        ;; For each rule, try to apply it
-       [r (in-list thy-rules)]
-       #:when (or (not path) (eq? (*rule-name r) (first path))))
+       [r (in-list thy-rules)])
+
+    ;; XXX Maybe add a special case where we look at each goal and see
+    ;; if only one rule applies and then apply it, because we will
+    ;; have to go through that at some point. (If one rule applies and
+    ;; derives false, this should be an early quit too.)
 
     ;; XXX If two rules R1 and R2 apply in the same state, then there
     ;; will be two next states---R1 o R2 and R2 o R1---but most of the
@@ -158,7 +162,6 @@
 (define (solve* #:theory [the-thy empty-theory]
                 #:vars [query-vars '()]
                 #:goals [initial-goals '()]
-                #:path [path #f]
                 #:count [k 1])
   (define (done? solutions)
     (and (<= k (length solutions))
@@ -174,7 +177,7 @@
                (values (gensym 'initial) g))
              (hasheq)))
      (list)))
-  (solve/tree the-thy st0 #:done? done? #:path path))
+  (solve/tree the-thy st0 #:done? done?))
 
 (define-simple-macro (with-vars (v:id ...) . body)
   (let ([v (var (gensym 'v))] ...) . body))
