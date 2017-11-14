@@ -33,12 +33,12 @@
        (syntax/loc stx
          (*rule 'name
                 (λ (a-constraint)
-                  (let ([v (var 'v)] ...)
+                  (with-vars (v ...)
                     (match a-constraint
                       [head
                        (cond
                          [guard
-                          (let ([body-id (var 'body-id)] ...)
+                          (with-vars (body-id ...)
                             (rule-succ
                              (list 'name v ... body-id ...)
                              (make-immutable-hasheq (list (cons body-id body) ...))
