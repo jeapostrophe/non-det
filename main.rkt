@@ -33,8 +33,10 @@
        (syntax/loc stx
          (*rule 'name
                 (λ (a-constraint)
+                  ;; XXX It is weird that these v are logic variables here
                   (with-vars (v ...)
                     (match a-constraint
+                      ;; XXX But the v are match variables here
                       [head
                        (cond
                          [guard
@@ -61,6 +63,8 @@
 (struct state (env goals proofs) #:transparent)
 (struct state-tree (active solutions) #:transparent)
 
+;; XXX In these functions, it would be nice to know what was already
+;; ground so we didn't always allocate and rebuild these things
 (define (apply-subst/hash lhs rhs ht)
   (for/hasheq ([(k v) (in-hash ht)])
     (values k (apply-subst/val lhs rhs v))))
@@ -84,48 +88,60 @@
      (match-define (state env goals proofs) st)
      (when (hash-has-key? env lhs)
        (error 'subst "Duplicate binding for ~e" lhs))
-     (state (apply-subst/hash lhs rhs env)
+     (state (hash-set (apply-subst/hash lhs rhs env) lhs rhs)
             (apply-subst/hash lhs rhs goals)
             (apply-subst/hash lhs rhs proofs))]))
 
 (define (solution? st)
-  ;; XXX It is okay if goals contains only unify/disunify
-  (empty? (state-goals st)))
+  ;; XXX It is okay if goals contains only unify/disunify which are
+  ;; disconnected, because they are constraints on free variables
+  (hash-empty? (state-goals st)))
 
-(define (solve/tree the-thy st done?)
+(define (solve/tree the-thy st #:done? done? #:path [path #f])
   (match-define (*theory thy-rules) the-thy)
   (match-define (state-tree active sols) st)
-  (printf "\n==========================\nACTIVE = ~e\nSOLS = ~e\n\n"
+  (printf "ACTIVE ~a // SOLS ~a\n"
           (length active) (length sols))
   (for*/fold
       ([a-rule-succ? #f]
-       [a-rule-guard-fail? #f]
        [new-active empty]
        [new-sols sols]
        #:result
        (cond
          ;; If there was a change
          [a-rule-succ?
-          (or (done? new-sols)
-              (solve/tree the-thy (state-tree new-active new-sols) done?))]
+          (or
+           ;; XXX We could wrap up the state so we can resume in the
+           ;; future
+           (done? new-sols)
+           (solve/tree the-thy (state-tree new-active new-sols)
+                       #:done? done? #:path (and path (rest path))))]
          [else
-          ;; XXX Return the tree?
+          ;; We never finished and now rule applies, so there's no
+          ;; work to be done.
           #f]))
       (;; Look at every single state (i.e. the fringe of the search space)
        [s (in-list active)]
        ;; For each goal, try to advance it
        [(g gc) (in-hash (state-goals s))]
        ;; For each rule, try to apply it
-       [r (in-list thy-rules)])
+       [r (in-list thy-rules)]
+       #:when (or (not path) (eq? (*rule-name r) (first path))))
+
+    ;; XXX If two rules R1 and R2 apply in the same state, then there
+    ;; will be two next states---R1 o R2 and R2 o R1---but most of the
+    ;; time these are identical, so it is a waste of search
+    ;; space. They should be separate if neither adds a substitution
+    ;; and they don't use the same goal. (Or if it adds a subst but
+    ;; there's no effect on R2)
+
     (match-define (state env goals proofs) s)
     (match-define (*rule name matcher) r)
     (match (matcher gc)
-      [(rule-fail)
-       (values a-rule-succ? a-rule-guard-fail? new-active new-sols)]
-      [(rule-guard-fail)
-       (values a-rule-succ? #t new-active new-sols)]
+      [(or (rule-fail)
+           (rule-guard-fail))
+       (values a-rule-succ? new-active new-sols)]
       [(rule-succ proof more-goals more-subst)
-       (eprintf "\t~a => ~a\n" gc proof)
        (define s-p
          (apply-subst
           more-subst
@@ -134,17 +150,17 @@
                  ;; XXX Detect if :false is one of the new goals?
                  (hash-union (hash-remove goals g) more-goals)
                  (hash-set proofs g proof))))
-       #;(pretty-print s-p)
        (if (solution? s-p)
-         (values #t a-rule-guard-fail? new-active (cons s-p new-sols))
-         (values #t a-rule-guard-fail? (cons s-p new-active) new-sols))])))
+         (values #t new-active (cons s-p new-sols))
+         (values #t (cons s-p new-active) new-sols))])))
 
 (define (solve* #:theory [the-thy empty-theory]
                 #:vars [query-vars '()]
                 #:goals [initial-goals '()]
+                #:path [path #f]
                 #:count [k 1])
   (define (done? solutions)
-    (and (< k (length solutions))
+    (and (<= k (length solutions))
          (for/list ([sol (in-list solutions)])
            (match-define (state env goals proofs) sol)
            (for/hasheq ([k (in-list query-vars)])
@@ -157,10 +173,10 @@
                (values (gensym 'initial) g))
              (hasheq)))
      (list)))
-  (solve/tree the-thy st0 done?))
+  (solve/tree the-thy st0 #:done? done? #:path path))
 
 (define-simple-macro (with-vars (v:id ...) . body)
-  (let ([v (var 'v)] ...) . body))
+  (let ([v (var (gensym 'v))] ...) . body))
 (define-simple-macro (solve (var:id ...) goal:expr ...)
   (with-vars (var ...)
     (solve* #:theory (current-theory)
@@ -184,7 +200,8 @@
 (struct :=/= (x y) #:prefab)
 (define-theory std-theory
   ;; XXX It stinks that cons is so baked in, because it would be nice
-  ;; to support any transparent or prefab struct
+  ;; to support any transparent or prefab struct (maybe make a prefab
+  ;; match expression)
 
   (rule (unify-id X)
         (:== X Y)
@@ -246,4 +263,44 @@
           (:remove x ys io)))
 
   (with-theory list-theory
-    (solve (O) (:remove 'A '(B A C) O))))
+    (solve (O) (:remove 'A '(B A C) O)))
+
+  #;
+  (with-vars (O)
+    (solve* #:theory list-theory
+            #:vars (list O)
+            #:goals (list (:remove 'A '(B A C) O))
+            #:path '(remove-tail disunify-diff unify-var-lhs remove-head unify-id unify-var-rhs unify-var-lhs))))
+
+#;([// (:remove 'A '(B A C) O)]
+   => remove-tail
+   [// (:=/= A B)
+       (:== O (cons B io0))
+       (:remove 'A '(A C) io0)]
+   => disunify-diff
+   [// (:== O (cons B io0))
+       (:remove 'A '(A C) io0)]
+   => unify-var-lhs
+   [(:== O (cons B io0))
+    //
+    (:remove 'A '(A C) io0)]
+   => remove-head
+   [(:== O (cons B io0))
+    //
+    (:== 'A 'A)
+    (:== '(C) io0)]
+   => unify-id
+   [(:== O (cons B io0))
+    //
+    (:== '(C) io0)]
+   => unify-var-rhs
+   [(:== O (cons B io0))
+    //
+    (:== io0 '(C))]
+   => unify-var-lhs
+   [(:== O '(B C))
+    (:== io0 '(C))
+    //])
+
+(module+ test
+  )
