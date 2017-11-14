@@ -131,7 +131,11 @@
     ;; XXX Maybe add a special case where we look at each goal and see
     ;; if only one rule applies and then apply it, because we will
     ;; have to go through that at some point. (If one rule applies and
-    ;; derives false, this should be an early quit too.)
+    ;; derives false, this should be an early quit too.) [However, if
+    ;; this rule diverges and another one would get to false, then we
+    ;; will be stuck, so there needs to be a way to balance them out
+    ;; and try different ones ---- maybe need a hash of goals and a
+    ;; queue of them?]
 
     ;; XXX If two rules R1 and R2 apply in the same state, then there
     ;; will be two next states---R1 o R2 and R2 o R1---but most of the
