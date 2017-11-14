@@ -303,4 +303,41 @@
     //])
 
 (module+ test
+  (struct :proves (Gamma Prop) #:prefab)
+  (struct :append (X Y Z) #:prefab)
+  (define-theory linear-logic
+    #:require list-theory
+
+    (rule (append-nil X Y Z)
+          (:append X Y Z)
+          #:=>
+          (:== X '())
+          (:== Y Z))
+    (rule (append-cons A B C X XS Z)
+          (:append A B C)
+          #:=>
+          (:== A (cons X XS))
+          (:append XS B Z)
+          (:== C (cons X Z)))
+    
+    (rule (assume A)
+          (:proves G A)
+          #:=>
+          (:== G (list A)))
+    (rule (tensor-elim A B C G D0 D1)
+          (:proves G C)
+          #:=>
+          (:append D0 D1 G)
+          (:proves D0 (list 'tensor A B))
+          (:proves (list* A B D1) C))
+    (rule (tensor-intro A B C D0 D1 G)
+          (:proves G C)
+          #:=>
+          (:== (list 'tensor A B) C)
+          (:append D0 D1 G)
+          (:proves D0 A)
+          (:proves D1 B)))
+
+  #;(with-theory linear-logic
+    (solve () (:proves '(A B) '(tensor A B))))
   )
