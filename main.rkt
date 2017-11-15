@@ -14,43 +14,31 @@
 (struct :false ())
 (define empty-theory (*theory empty))
 
-(struct *rule (name matcher))
-(struct rule-succ (proof body maybe-subst))
-(struct rule-guard-fail ())
-(define the-rule-guard-fail (rule-guard-fail))
+(struct *rule (matcher))
+(struct rule-succ (new-env proof body))
 (struct rule-fail ())
 (define the-rule-fail (rule-fail))
+
+;; XXX :== :=/= :fail :true, racket function calls
 
 (define-syntax (rule stx)
   (syntax-parse stx
     [(_ (name:id v:id ...)
-        head:expr
-        (~optional (~seq #:when guard:expr)
-                   #:defaults ([guard #'#t]))
-        #:=> body:expr ...
-        (~optional (~seq #:subst! subst-lhs:id subst-rhs:expr)
-                   #:defaults ([subst-lhs #'#f] [subst-rhs #'#f])))
+        head:expr #:=> body:expr ...)
      (with-syntax ([(body-id ...) (generate-temporaries #'(body ...))])
        (syntax/loc stx
-         (*rule 'name
-                (λ (a-constraint)
-                  ;; XXX It is weird that these v are logic variables here
+         (*rule (λ (env a-constraint)
                   (with-vars (v ...)
-                    (match a-constraint
-                      ;; XXX But the v are match variables here, we
-                      ;; should really build-in unify
-                      [head
-                       (cond
-                         [guard
-                          (with-vars (body-id ...)
-                            (rule-succ
-                             (list 'name v ... body-id ...)
-                             (make-immutable-hasheq (list (cons body-id body) ...))
-                             (and subst-lhs subst-rhs
-                                  (cons subst-lhs subst-rhs))))]
-                         [else
-                          the-rule-guard-fail])]
-                      [_
+                    (cond
+                      [(unify env a-constraint head)
+                       => (λ (new-env)
+                            (with-vars (body-id ...)
+                              (rule-succ
+                               new-env
+                               (list 'name v ... body-id ...)
+                               (make-immutable-hasheq
+                                (list (cons body-id body) ...)))))]
+                      [else
                        the-rule-fail]))))))]))
 
 (define (theory-flatten l)
@@ -60,45 +48,10 @@
   (syntax-parse stx
     [(_ (~optional #:require) rules:expr ...)
      (syntax/loc stx
-       (*theory (theory-flatten (list rules ...))))]))
+       (*theory (theory-flatten (list empty-theory rules ...))))]))
 
+;; Search Algorithm
 (struct state (env goals proofs) #:transparent)
-
-;; XXX In these functions, it would be nice to know what was already
-;; ground so we didn't always allocate and rebuild these things
-(define (apply-subst/hash lhs rhs ht)
-  (for/hasheq ([(k v) (in-hash ht)])
-    (values k (apply-subst/val lhs rhs v))))
-(define (apply-subst/val lhs rhs v)
-  (match v
-    [(== lhs) rhs]
-    [(cons a d)
-     (cons (apply-subst/val lhs rhs a)
-           (apply-subst/val lhs rhs d))]
-    [(app prefab-struct-key (and (not #f) psk))
-     (apply
-      make-prefab-struct
-      psk
-      (apply-subst/val lhs rhs (struct->list v)))]
-    [x x]))
-(define (apply-subst maybe-subst st)
-  (match maybe-subst
-    [#f st]
-    [(cons (? var? lhs) rhs)
-     ;; XXX Occurs check
-     (match-define (state env goals proofs) st)
-     (when (hash-has-key? env lhs)
-       (error 'subst "Duplicate binding for ~e" lhs))
-     (state (hash-set (apply-subst/hash lhs rhs env) lhs rhs)
-            (apply-subst/hash lhs rhs goals)
-            (apply-subst/hash lhs rhs proofs))]))
-
-(define (solution? st)
-  ;; XXX It is okay if goals contains only unify/disunify which are
-  ;; disconnected, because they are constraints on free variables
-  (hash-empty? (state-goals st)))
-
-;; Steps
 (struct *query (thy extract step))
 (struct step:next-state (in out) #:transparent)
 (struct step:init-goalq (st:in st:out st st-progress?) #:transparent)
@@ -172,6 +125,7 @@
       ;; 2) Initialize the goal queue
       [(step:init-goalq st:in st:out st st-progress?)
        (match-define (state env goals proofs) st)
+       ;; XXX Sort the goals based on how ground they are
        (step:next-goal1 st:in st:out st st-progress? (hash-keys goals) empty)]
       ;; 3) Work on goals by applying them to rules. If a goal has
       ;; multiple options, look at it later
@@ -194,12 +148,10 @@
        (match r:in
          ;; If there are rules left, then try to apply one
          [(cons active-rule r:in)
-          (match (apply-rule active-rule active-goal-term)
+          (match-define (state env goals proofs) st)
+          (match (apply-rule env active-rule active-goal-term)
             ;; If the rule doesn't apply, then move on
-            ;;
-            ;; XXX May want to remember that it was a guard that failed
-            ;; and try this later
-            [(or (rule-fail) (rule-guard-fail))
+            [(rule-fail)
              (step:next-rule1 st:in st:out st st-progress? g:in g:br
                               active-goal active-goal-term r:in r:out)]
             ;; If it does apply then...
@@ -245,12 +197,10 @@
        (match r:in
          ;; If there is a rule, try to apply it
          [(cons active-rule r:in)
-          (match (apply-rule active-rule agt)
+          (match-define (state env goals proofs) st)
+          (match (apply-rule env active-rule agt)
             ;; If the rule doesn't apply, then move on
-            ;;
-            ;; XXX May want to remember that it was a guard that failed
-            ;; and try this later
-            [(or (rule-fail) (rule-guard-fail))
+            [(rule-fail)
              (step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in)]
             ;; If it does apply then... and create a new child state
             [(? rule-succ? succ)
@@ -267,7 +217,7 @@
       ;; return it as a solution or put it on the out queue
       [(step:end-state st:in st:out st st-progress?)
        (cond
-         [(solution? st)
+         [(st-solution? st)
           (step:solution st (step:next-state st:in st:out))]
          [st-progress?
           (step:next-state st:in (cons st st:out))]
@@ -282,19 +232,21 @@
   (show-step sp)
   (*query thy extract sp))
 
+(define (st-solution? st)
+  ;; XXX It is okay if goals contains only unify/disunify which are
+  ;; disconnected, because they are constraints on free variables
+  (hash-empty? (state-goals st)))
 (define (apply-succ st active-goal succ)
   (match-define (state env goals proofs) st)
-  (match-define (rule-succ proof more-goals more-subst) succ)
-  (apply-subst
-   more-subst
-   (state env
-          ;; XXX Detect if any more-goals has already been seen
-          ;; XXX Detect if :false is one of the new goals?
-          (hash-union (hash-remove goals active-goal) more-goals)
-          (hash-set proofs active-goal proof))))
-(define (apply-rule r t)
-  (match-define (*rule name matcher) r)
-  (matcher t))
+  (match-define (rule-succ new-env proof more-goals) succ)
+  (state new-env
+         ;; XXX Detect if any more-goals has already been seen
+         ;; XXX Detect if :false is one of the new goals?
+         (hash-union (hash-remove goals active-goal) more-goals)
+         (hash-set proofs active-goal proof)))
+(define (apply-rule env r t)
+  (match-define (*rule matcher) r)
+  (matcher env t))
 (define (query-return? q)
   (match-define (*query thy extract step) q)
   (or (step:done? step)
@@ -306,6 +258,50 @@
   (match-define (*query thy extract step) q)
   (match-define (step:solution sol k) step)
   (extract sol))
+
+(define (unbound-var? env q1)
+  (and (var? q1)
+       (not (hash-has-key? env q1))))
+(define (bound-var? env q1)
+  (and (var? q1)
+       (hash-has-key? env q1)))
+(define prefab? prefab-struct-key)
+(define (unify env q1 q2)
+  (cond
+    [(equal? q1 q2)
+     env]
+    [(unbound-var? env q1)
+     (hash-set env q1 q2)]
+    [(unbound-var? env q2)
+     (hash-set env q2 q1)]
+    [(bound-var? env q1)
+     (unify env (hash-ref env q1) q2)]
+    [(bound-var? env q2)
+     (unify env q1 (hash-ref env q2))]
+    [(and (pair? q1) (pair? q2))
+     (define new-env (unify env (car q1) (car q2)))
+     (and new-env
+          (unify new-env (cdr q1) (cdr q2)))]
+    [(and (prefab? q1) (prefab? q2))
+     (define psk1 (prefab-struct-key q1))
+     (define psk2 (prefab-struct-key q2))
+     (if (equal? psk1 psk2)
+       (unify env (struct->list q1) (struct->list q2))
+       #f)]
+    [else #f]))
+(define (env-deref env v)
+  (cond
+    [(bound-var? env v)
+     (env-deref env (hash-ref env v))]
+    [(cons? v)
+     (cons (env-deref env (car v))
+           (env-deref env (cdr v)))]
+    [(prefab? v)
+     (define psk (prefab-struct-key v))
+     (apply make-prefab-struct psk
+            (env-deref env (struct->list v)))]
+    [else
+     v]))
 
 ;; Main interface := Construct a query, step until you a reach a
 ;; solution, potentially ask for more solutions.
@@ -341,7 +337,7 @@
   (λ (sol)
     (match-define (state env goals proofs) sol)
     (for/hasheq ([k (in-list vs)])
-      (values (var-id k) (hash-ref env k)))))
+      (values (var-id k) (env-deref env k)))))
 (define-simple-macro (with-vars (v:id ...) . body)
   (let ([v (var (gensym 'v))] ...) . body))
 (define-simple-macro (solve (var:id ...) goal:expr)
@@ -357,79 +353,17 @@
 (define-simple-macro (with-theory x:id . body)
   (parameterize ([current-theory x]) . body))
 
-;; XXX Maybe make these a structure so we cache the result
-(define ground?
-  (match-lambda
-    [(? var?) #f]
-    [(cons a d) (and (ground? a) (ground? d))]
-    [_ #t]))
-
-;; Library
-(struct :== (x y) #:prefab)
-(struct :=/= (x y) #:prefab)
-(define-theory std-theory
-  ;; XXX It stinks that cons is so baked in, because it would be nice
-  ;; to support any transparent or prefab struct (maybe make a prefab
-  ;; match expression)
-
-  (rule (unify-id X)
-        (:== X Y)
-        #:when (equal? X Y)
-        #:=>)
-  (rule (unify-var-lhs X Y)
-        (:== X Y)
-        #:when (and (var? X) (not (equal? X Y)))
-        #:=>
-        #:subst! X Y)
-  (rule (unify-var-rhs X Y)
-        (:== X Y)
-        #:when (and (var? Y) (not (equal? X Y)))
-        #:=> (:== Y X))
-  (rule (unify-cons xA xD yA yD)
-        (:== (cons xA xD) (cons yA yD))
-        #:=>
-        (:== xA yA)
-        (:== xD yD))
-
-  (rule (disunify-diff X Y)
-        (:=/= X Y)
-        #:when (and (ground? X) (ground? Y) (not (equal? X Y)))
-        #:=>)
-  #;(rule (disunify-id X)
-          (:=/= X X)
-          #:=> (:false))
-  (rule (disunify-cons-car xA xD yA yD)
-        (:=/= (cons xA xD) (cons yA yD))
-        #:=> (:=/= xA yA))
-  (rule (disunify-cons-cdr xA xD yA yD)
-        (:=/= (cons xA xD) (cons yA yD))
-        #:=> (:=/= xD yD))
-  (rule (disunify-cons-lhs xA xD Y)
-        (:=/= (cons xA xD) Y)
-        #:when (and (not (var? Y)) (not (cons? Y)))
-        #:=>)
-  (rule (disunify-cons-rhs xA xD Y)
-        (:=/= Y (cons xA xD))
-        #:when (and (not (var? Y)) (not (cons? Y)))
-        #:=> (:=/= (cons xA xD) Y)))
-
 ;; Tests
 (module+ test
   (struct :remove (x xs o) #:prefab)
   (define-theory list-theory
-    #:require std-theory
-
-    (rule (remove-head x y ys o)
-          (:remove x (cons y ys) o)
+    (rule (remove-head x xs)
+          (:remove x (cons x xs) xs)
+          #:=>)
+    (rule (remove-tail x y ys o)
+          (:remove x (cons y ys) (cons y o))
           #:=>
-          (:== x y)
-          (:== ys o))
-    (rule (remove-tail x y ys o io)
-          (:remove x (cons y ys) o)
-          #:=>
-          (:=/= x y)
-          (:== o (cons y io))
-          (:remove x ys io)))
+          (:remove x ys o)))
 
   (with-theory list-theory
     (solve (O) (:remove 'A '(B A C) O))))
@@ -440,36 +374,32 @@
   (define-theory linear-logic
     #:require list-theory
 
-    (rule (append-nil X Y Z)
-          (:append X Y Z)
+    (rule (append-nil Y)
+          (:append '() Y Y)
+          #:=>)
+    (rule (append-cons X XS B Z)
+          (:append (cons X XS) B (cons X Z))
           #:=>
-          (:== X '())
-          (:== Y Z))
-    (rule (append-cons A B C X XS Z)
-          (:append A B C)
-          #:=>
-          (:== A (cons X XS))
-          (:append XS B Z)
-          (:== C (cons X Z)))
+          (:append XS B Z))
 
     (rule (assume A)
-          (:proves G A)
-          #:=>
-          (:== G (list A)))
+          (:proves (list A) A)
+          #:=>)
     (rule (tensor-elim A B C G D0 D1)
           (:proves G C)
           #:=>
           (:append D0 D1 G)
           (:proves D0 (list 'tensor A B))
           (:proves (list* A B D1) C))
-    (rule (tensor-intro A B C D0 D1 G)
-          (:proves G C)
+    (rule (tensor-intro A B D0 D1 G)
+          (:proves G (list 'tensor A B))
           #:=>
-          (:== (list 'tensor A B) C)
           (:append D0 D1 G)
           (:proves D0 A)
           (:proves D1 B)))
 
-  #;(with-theory linear-logic
-      (solve () (:proves '(A B) '(tensor A B))))
+  (with-theory linear-logic
+    (solve (X Y) (:append X Y '(A B)))
+    #;
+    (solve () (:proves '(A) 'A)))
   )
