@@ -363,6 +363,9 @@
 (define-simple-macro (with-theory x:id . body)
   (parameterize ([current-theory x]) . body))
 
+;; XXX Make this right
+(provide (all-defined-out))
+
 ;; Tests
 (module+ test
   (struct :remove (x xs o) #:prefab)
