@@ -25,9 +25,10 @@
    (match P
      [(list 'tensor A B)
       (mdo [(cons Γ Δ) (answers (partitions-of Γ))]
-           [(list A-pf B-pf) (join (prove-direct Γ A) (prove-direct Δ B))]
+           [A-pf (prove-direct Γ A)]
+           [B-pf (prove-direct Δ B)]
            (answer (list 'TensorIntro Γ Δ A-pf B-pf)))]
-     ;; XXX WithIntro --- obvious, using join
+     ;; XXX WithIntro --- obvious
 
      ;; XXX XorIntro --- obvious, using par
 
@@ -57,7 +58,7 @@
     ;; we should sort these to the end so that they are split at the
     ;; end rather than early, but maybe it doesn't matter?)
 
-    ;; XXX XorElim --- This would generate a join
+    ;; XXX XorElim --- This would generate two Proofs
 
     ;; XXX LolliElim --- I don't think this should be here because
     ;; it is not obvious how to eliminate.

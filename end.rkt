@@ -129,11 +129,6 @@
   (for/fold ([p (fail)]) ([sp (in-list l)])
     (*par p sp)))
 
-(define-simple-macro (join e:expr ...)
-  #:with (v ...) (generate-temporaries #'(e ...))
-  (mdo [v e] ...
-       (answer (list v ...))))
-
 (define (answer-seq s) (*ans #f (sequence->stream s)))
 (define (answer-infseq s) (*ans #t (sequence->stream s)))
 (define-simple-macro (answers as:expr)
@@ -152,7 +147,6 @@
  mdo
  bind
  par
- join
  answer-seq
  answer-infseq
  answers
