@@ -1,13 +1,9 @@
 #lang racket/base
 (require (for-syntax racket/base
-                     racket/syntax
                      syntax/parse)
          racket/match
-         racket/format
          racket/list
          racket/stream
-         racket/sequence
-         racket/exn
          syntax/parse/define)
 (module+ test
   (require chk))
@@ -120,22 +116,22 @@
   (solve/k k (step:next-state (list (state p (kont:return))) empty)))
 
 ;;;; Library
-(define-syntax (do stx))
+(define-syntax (mdo stx)
+  (syntax-parse stx
+    [(_) (syntax/loc stx (fail))]
+    [(_ p) #'p]
+    [(_ [pat:expr x] . more)
+     (syntax/loc stx
+       (bind x (match-lambda [pat (mdo . more)])))]))
 
 (define (par . l)
   (for/fold ([p (fail)]) ([sp (in-list l)])
     (*par p sp)))
 
-(define-syntax (join stx)
-  (syntax-parse stx
-    [(_) (syntax/loc stx (answer empty))]
-    [(_ e es ...)
-     (syntax/loc stx
-       (bind e
-             (λ (v)
-               (bind (join es ...)
-                     (λ (vs)
-                       (answer (cons v vs)))))))]))
+(define-simple-macro (join e:expr ...)
+  #:with (v ...) (generate-temporaries #'(e ...))
+  (mdo [v e] ...
+       (answer (list v ...))))
 
 (define (answer-seq s) (*ans #f (sequence->stream s)))
 (define (answer-infseq s) (*ans #t (sequence->stream s)))
@@ -154,7 +150,7 @@
       (cons before after)))
 
   ;; XXX Can we memoize this to not repeat work?
-  
+
   ;; Here we try to prove things directly... essentially this means
   ;; using the introduction rules.
   (define (prove-direct Γ P)
@@ -167,17 +163,13 @@
      ;; Next, try to look at the goal and go prove it directly
      (match P
        [(list 'tensor A B)
-        (bind (answers (partitions-of Γ))
-              (match-lambda
-                [(cons Γ Δ)
-                 (bind (join (prove-direct Γ A) (prove-direct Δ B))
-                       (match-lambda
-                         [(list A-pf B-pf)
-                          (answer (list 'TensorIntro Γ Δ A-pf B-pf))]))]))]
+        (mdo [(cons Γ Δ) (answers (partitions-of Γ))]
+             [(list A-pf B-pf) (join (prove-direct Γ A) (prove-direct Δ B))]
+             (answer (list 'TensorIntro Γ Δ A-pf B-pf)))]
        ;; XXX WithIntro --- obvious, using join
 
        ;; XXX XorIntro --- obvious, using par
-       
+
        ;; XXX LolliIntro --- must consider each place inside of Γ to insert A
 
        ;; XXX LolliElim --- I think this should be here and include an
@@ -187,11 +179,9 @@
   ;; want to go into infinite loops consider permutations over and
   ;; over again.
   (define (permute-then-prove Γ P)
-    (bind (answer-seq (in-permutations Γ))
-          (λ (Γp)
-            (bind (prove-direct Γp P)
-                  (λ (pf)
-                    (answer (list 'Exchange Γp pf)))))))
+    (mdo [Γp (answer-seq (in-permutations Γ))]
+         [pf (prove-direct Γp P)]
+         (answer (list 'Exchange Γp pf))))
   ;; This strategy looks at the context and breaks everything up into
   ;; its constituent pieces. After we have all the pieces, then we
   ;; permute. Essentially, we are applying all of the elimination
@@ -200,9 +190,8 @@
     (match Γin
       ['() (permute-then-prove Γout P)]
       [(cons (list 'tensor A B) Γin)
-       (bind (breakup-assumptions (list* A B Γin) Γout P)
-             (λ (pf)
-               (answer (list 'TensorElim A B pf))))]
+       (mdo [pf (breakup-assumptions (list* A B Γin) Γout P)]
+            (answer (list 'TensorElim A B pf)))]
       ;; XXX WithElim --- This would provide two answers (so perhaps
       ;; we should sort these to the end so that they are split at the
       ;; end rather than early, but maybe it doesn't matter?)
