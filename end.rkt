@@ -5,10 +5,11 @@
          racket/list
          racket/stream
          syntax/parse/define)
-(module+ test
-  (require chk))
 
-;;;; Exposed Non-determinism
+;; This implements a form of non-determinism that is similar
+;; syntactically to Racklog/etc but is written monadically and allows
+;; a breadth-first search approach
+
 (struct fail ())
 (struct bind (x mx))
 (struct *par (x y))
@@ -28,7 +29,10 @@
 
 (define step
   (match-lambda
-    ;; Implement a queue of problems
+    ;; Implement a queue of problems --- and thus run with BFS ---
+    ;; although we could instead use a functional priority queue and
+    ;; get either DFS or something like A* if we could inspect the
+    ;; states and make some decision.
     [(step:next-state in out)
      (match in
        [(cons next in)
@@ -38,7 +42,6 @@
           [(empty? out)
            (step:done)]
           [else
-           ;; XXX Could sort out based on something?
            (step:next-state (reverse out) empty)])])]
     ;; Do one unit of work for this problem
     [(step:work1 st:in st:out (state p k))
@@ -48,7 +51,7 @@
         (step:next-state st:in (list* (state x (kont:bind mx k)) st:out))]
        [(*ans inf? s)
         ;; xxx if it is inf, then put a par at the end? so we do
-        ;; something like DFS
+        ;; something like DFS --- maybe this is stupid.
         (cond
           [(stream-empty? s)
            (step:next-state st:in (list* (state (fail) k) st:out))]
@@ -62,12 +65,10 @@
        ;; ...And when it ends in a result...
        [(fail)
         (match k
-          ;; When a fail goes to a par, then ignore it and choose the
-          ;; other option
+          ;; If it goes to a par, then ignore and choose the other
           [(kont:par y k)
            (step:next-state st:in (list* (state y k) st:out))]
-          ;; If it goes to a bind, then ignore mx and fall to
-          ;; continuation
+          ;; If it goes to a bind, then ignore mx and fall to k
           [(kont:bind mx k)
            (step:next-state st:in (list* (state p k) st:out))]
           ;; If it goes to a return, then throw away the state
@@ -79,16 +80,16 @@
           ;; duplicate the continuation
           [(kont:par y k)
            (step:next-state st:in (list* (state p k) (state y k) st:out))]
+          ;; Call the function on a bind
           [(kont:bind mx k)
            (step:next-state st:in (list* (state (mx a) k) st:out))]
+          ;; We found a solution!
           [(kont:return)
            (step:solution a (step:next-state st:in st:out))])])]
     ;; When a solution is stepped, move on
-    [(step:solution _ k)
-     k]
+    [(step:solution _ k) k]
     ;; When done, fix
-    [(? step:done? s)
-     s]))
+    [(? step:done? s) s]))
 
 (define (query-done? q)
   (or (step:done? q)))
@@ -140,77 +141,19 @@
 (define-simple-macro (answer a:expr)
   (*ans1 a))
 
-;;;; Tests
+;; XXX Implement some sort of `memo` operation that will safe work
+;; that appears in multiple places in the search space.
 
-;; This is the standard prover.
-(module+ test
-  (define (partitions-of l)
-    (for/list ([i (in-range (length l))])
-      (define-values (before after) (split-at l i))
-      (cons before after)))
+;; XXX Write tests
 
-  ;; XXX Can we memoize this to not repeat work?
-
-  ;; Here we try to prove things directly... essentially this means
-  ;; using the introduction rules.
-  (define (prove-direct Γ P)
-    (par
-     ;; First, try to use an assumption
-     (match Γ
-       [(list (== P))
-        (answer (list 'LId))]
-       [_ (fail)])
-     ;; Next, try to look at the goal and go prove it directly
-     (match P
-       [(list 'tensor A B)
-        (mdo [(cons Γ Δ) (answers (partitions-of Γ))]
-             [(list A-pf B-pf) (join (prove-direct Γ A) (prove-direct Δ B))]
-             (answer (list 'TensorIntro Γ Δ A-pf B-pf)))]
-       ;; XXX WithIntro --- obvious, using join
-
-       ;; XXX XorIntro --- obvious, using par
-
-       ;; XXX LolliIntro --- must consider each place inside of Γ to insert A
-
-       ;; XXX LolliElim --- I think this should be here and include an
-       ;; embedded Exhange proof
-       [_ (fail)])))
-  ;; We permute here, rather than in the direct loop, because we don't
-  ;; want to go into infinite loops consider permutations over and
-  ;; over again.
-  (define (permute-then-prove Γ P)
-    (mdo [Γp (answer-seq (in-permutations Γ))]
-         [pf (prove-direct Γp P)]
-         (answer (list 'Exchange Γp pf))))
-  ;; This strategy looks at the context and breaks everything up into
-  ;; its constituent pieces. After we have all the pieces, then we
-  ;; permute. Essentially, we are applying all of the elimination
-  ;; forms.
-  (define (breakup-assumptions Γin Γout P)
-    (match Γin
-      ['() (permute-then-prove Γout P)]
-      [(cons (list 'tensor A B) Γin)
-       (mdo [pf (breakup-assumptions (list* A B Γin) Γout P)]
-            (answer (list 'TensorElim A B pf)))]
-      ;; XXX WithElim --- This would provide two answers (so perhaps
-      ;; we should sort these to the end so that they are split at the
-      ;; end rather than early, but maybe it doesn't matter?)
-
-      ;; XXX XorElim --- This would generate a join
-
-      ;; XXX LolliElim --- I don't think this should be here because
-      ;; it is not obvious how to eliminate.
-      [(cons (? symbol? A) Γin)
-       ;; XXX Technically this should have a proof that does an
-       ;; exchange skipping over A
-       (breakup-assumptions Γin (cons A Γout) P)]))
-  ;; Start off the algorithm
-  (define (proves-top Γ P)
-    (breakup-assumptions Γ empty P))
-
-  (solve #:k 1 (proves-top '(A) 'A))
-  (solve #:k 1 (proves-top '(A B) '(tensor A B)))
-  (solve #:k 1 (proves-top '(A B) '(tensor B A)))
-  (solve #:k 1 (proves-top '((tensor A B)) '(tensor B A))))
-
-;; XXX Implement the In -> Out version of assumptions too
+(provide
+ solve
+ fail
+ mdo
+ bind
+ par
+ join
+ answer-seq
+ answer-infseq
+ answers
+ answer)
