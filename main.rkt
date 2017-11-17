@@ -80,7 +80,8 @@
 (define-generics constraint
   (constraint-rules constraint))
 
-(struct rule-succ (new-env proof body))
+(struct *rule (name matcher))
+(struct rule-succ (name new-env proof body))
 (struct rule-fail ())
 (define the-rule-fail (rule-fail))
 
@@ -111,19 +112,22 @@
                     (apply rname l))]))
              #:attr matcher
              (syntax/loc this-syntax
-               (λ (env a-constraint)
-                 (with-vars (v ...)
-                   (cond
-                     [(unify env a-constraint head)
-                      => (λ (new-env)
-                           (with-vars (body-id ...)
-                             (rule-succ
-                              new-env
-                              (rname v ... body-id ...)
-                              (make-immutable-hasheq
-                               (list (cons body-id body) ...)))))]
-                     [else
-                      the-rule-fail])))))))
+               (*rule
+                'rname
+                (λ (env a-constraint)
+                  (with-vars (v ...)
+                    (cond
+                      [(unify env a-constraint head)
+                       => (λ (new-env)
+                            (with-vars (body-id ...)
+                              (rule-succ
+                               'rname
+                               new-env
+                               (rname v ... body-id ...)
+                               (make-immutable-hasheq
+                                (list (cons body-id body) ...)))))]
+                      [else
+                       the-rule-fail]))))))))
 (define-syntax (define-constraint stx)
   (syntax-parse stx
     [(_ (cname:id v:id ...) r:constraint-rule ...)
@@ -147,17 +151,17 @@
                 (apply cname l))]))))]))
 
 ;; Search Algorithm
-(struct state (env goals) #:transparent)
+(struct state (env goals))
 (struct *query (extract step))
-(struct step:next-state (in out) #:transparent)
-(struct step:init-goalq (st:in st:out st st-progress?) #:transparent)
-(struct step:next-goal1 (st:in st:out st st-progress? g:in g:br) #:transparent)
-(struct step:next-rule1 (st:in st:out st st-progress? g:in g:br ag agt r:in r:out) #:transparent)
-(struct step:next-goalN (st:in st:out st st-progress? g:br) #:transparent)
-(struct step:next-ruleN (st:in st:out st st-progress? g:br ag agt r:in) #:transparent)
-(struct step:end-state (st:in st:out st st-progress?) #:transparent)
-(struct step:solution (sol next) #:transparent)
-(struct step:done () #:transparent)
+(struct step:next-state (in out))
+(struct step:init-goalq (st:in st:out st st-progress?))
+(struct step:next-goal1 (st:in st:out st st-progress? g:in g:br))
+(struct step:next-rule1 (st:in st:out st st-progress? g:in g:br ag agt r:in r:out))
+(struct step:next-goalN (st:in st:out st st-progress? g:br))
+(struct step:next-ruleN (st:in st:out st st-progress? g:br ag agt r:in st:br))
+(struct step:end-state (st:in st:out st st-progress?))
+(struct step:solution (sol next))
+(struct step:done ())
 
 (define (format-st st)
   (match-define (state env goals) st)
@@ -181,17 +185,18 @@
          " / " (format-st st) " " st-progress?
          " G(" (length g:in) ", " (length g:br) ")"
          " " (format-term st agt)
-         " R(" (length r:in) ", " (length r:out) ")")]
+         " R(" (length r:in) ", " (map rule-succ-name r:out) ")")]
     [(step:next-goalN st:in st:out st st-progress? g:br)
      (~a "5: next-goalN " (length st:in) " -> " (length st:out)
          " / " (format-st st) " " st-progress?
          " GBR(" (length g:br) ")")]
-    [(step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in)
+    [(step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in st:br)
      (~a "6: next-ruleN " (length st:in) " -> " (length st:out)
          " / " (format-st st) " " st-progress?
          " GBR(" (length g:br) ")"
          " " (format-term st agt)
-         " R(" (length r:in) ")")]
+         " R(" (length r:in) ")"
+         " STBR(" (length st:br) ")")]
     [(step:end-state st:in st:out st st-progress?)
      (~a "7: end-state " (length st:in) " -> " (length st:out)
          " / " (format-st st) " " st-progress?)]
@@ -217,11 +222,16 @@
           ;; If there are no more period, then stop
           (step:done)
           ;; Otherwise, start again from the beginning
+          ;;
+          ;; XXX Can we remove-duplicates on this, especially relative
+          ;; to everything we've seen?
           (step:next-state (reverse out) empty))])]
     ;; 2) Initialize the goal queue
     [(step:init-goalq st:in st:out st st-progress?)
      (match-define (state env goals) st)
      ;; XXX Sort the goals based on how ground they are
+     (pretty-print (for/list ([(g gt) (in-hash goals)])
+                     (cons g (env-deref env gt))))
      (step:next-goal1 st:in st:out st st-progress? (hash-keys goals) empty)]
     ;; 3) Work on goals by applying them to rules. If a goal has
     ;; multiple options, look at it later
@@ -277,6 +287,10 @@
     ;; an earlier single rule could have eliminated the one or more
     ;; of the options---that's why we didn't save the matcher
     ;; results)
+    ;;
+    ;; XXX Maybe I should only choose one of these to branch on,
+    ;; rather than all of them. But how to ensure I don't go down an
+    ;; unproductive path?
     [(step:next-goalN st:in st:out st st-progress? g:br)
      (match g:br
        [(cons active-goal g:br)
@@ -286,12 +300,13 @@
         (step:next-ruleN st:in st:out st st-progress?
                          g:br
                          active-goal active-goal-term
-                         (constraint-rules active-goal-term))]
+                         (constraint-rules active-goal-term)
+                         empty)]
        ['()
         ;; Otherwise, finalize looking at a state
         (step:end-state st:in st:out st st-progress?)])]
     ;; 6) Consider each rule for branching goals
-    [(step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in)
+    [(step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in st:br)
      (match r:in
        ;; If there is a rule, try to apply it
        [(cons active-rule r:in)
@@ -299,19 +314,24 @@
         (match (apply-rule env active-rule agt)
           ;; If the rule doesn't apply, then move on
           [(rule-fail)
-           (step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in)]
+           (step:next-ruleN st:in st:out st st-progress? g:br ag agt r:in st:br)]
           ;; If it does apply then... and create a new child state
           [(? rule-succ? succ)
-           ;; XXX It might end that now there is only one rule that matches
-           (step:next-ruleN st:in (cons (apply-succ st ag succ) st:out)
-                            ;; Because we are forking the state
-                            ;; here, any progress that we made will
-                            ;; be preserved in the forked state, so
-                            ;; we set st-progress back to #f
-                            st #f g:br ag agt r:in)])]
+           (step:next-ruleN st:in st:out
+                            st st-progress? g:br ag agt r:in
+                            (cons (apply-succ st ag succ) st:br))])]
        ;; If there are no more rules, then go to next goal
        ['()
-        (step:next-goalN st:in st:out st st-progress? g:br)])]
+        (match st:br
+          ['()
+           (step:next-goalN st:in st:out st st-progress? g:br)]
+          [(list uniq-next-st)
+           (step:next-goalN st:in st:out uniq-next-st #t g:br)]
+          [many-next-sts
+           ;; Because we are forking the state here, any progress that
+           ;; we made will be preserved in the forked state, so we set
+           ;; st-progress back to #f
+           (step:next-goalN st:in (append many-next-sts st:out) st #f g:br)])])]
     ;; 7) When we are done looking at a state, then decide if we will
     ;; return it as a solution or put it on the out queue
     [(step:end-state st:in st:out st st-progress?)
@@ -335,11 +355,12 @@
   (hash-empty? (state-goals st)))
 (define (apply-succ st active-goal succ)
   (match-define (state env goals) st)
-  (match-define (rule-succ new-env proof more-goals) succ)
+  (match-define (rule-succ rname new-env proof more-goals) succ)
   (state (hash-set new-env active-goal proof)
          ;; XXX Detect if any more-goals has already been seen
          (hash-union (hash-remove goals active-goal) more-goals)))
-(define (apply-rule env matcher t)
+(define (apply-rule env r t)
+  (match-define (*rule name matcher) r)
   (matcher env t))
 (define (query-return? q)
   (match-define (*query extract step) q)
@@ -481,7 +502,7 @@
 
 ;; Linear Logic --- Version 2
 (module+ test
-  (when #t
+  (when #f
     (define-constraint (:proves In Prop Out)
       (rule (R:assume In A Out)
             (:proves In A Out)
@@ -500,7 +521,7 @@
 
     (run #:proof solve/k 1 () (:proves '(A) 'A '()))
     (run #:proof solve/k 1 () (:proves '(A B) '(tensor A B) '()))
-    #;(run #:proof solve/k 1 () (:proves '(B A) '(tensor A B) '()))
+    (run #:proof solve/k 1 () (:proves '(B A) '(tensor A B) '()))
     ;; Diverges
     #;
     (run #:proof solve/k 1 () (:proves '((tensor A B)) '(tensor B A) '()))))
