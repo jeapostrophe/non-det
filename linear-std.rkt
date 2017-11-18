@@ -30,7 +30,7 @@
    (match Γ
      [(list (== P))
       (ans (Lid))]
-     [_ (fail)])
+     [_ fail])
    ;; Next, try to look at the goal and go prove it directly
    (match P
      [(tensor A B)
@@ -46,7 +46,7 @@
 
      ;; XXX LolliElim --- I think this should be here and include an
      ;; embedded Exhange proof
-     [_ (fail)])))
+     [_ fail])))
 ;; We permute here, rather than in the direct loop, because we don't
 ;; want to go into infinite loops consider permutations over and
 ;; over again.

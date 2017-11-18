@@ -4,11 +4,12 @@
          racket/match
          racket/list
          racket/stream
-         racket/generic
-         syntax/parse/define)
+         racket/contract
+         racket/generic)
 
 (struct nd ())
-(struct fail nd ())
+(struct *fail nd ())
+(define fail (*fail))
 (struct bind nd (x mx))
 (struct *par nd (x y))
 (struct ans nd (a))
@@ -36,11 +37,11 @@
        [(seq s)
         (cond
           [(stream-empty? s)
-           (sols (enq q (st (fail) k)))]
+           (sols (enq q (st fail k)))]
           [else
            (sols (enq q (st (*par (ans (stream-first s)) (seq (stream-rest s))) k)))])]
        ;; ...And when it ends in a result...
-       [(fail)
+       [(*fail)
         (match k
           ;; If it goes to a par, then ignore and choose the other
           [(kont:par y k)   (sols (enq q (st y k)))]
@@ -57,11 +58,6 @@
           [(kont:bind mx k) (sols (enq q (st (mx a) k)))]
           ;; We found a solution!
           [(kont:return)    (stream-cons a (sols q))])])]))
-
-(define (stream-take k s)
-  (for/list ([i (in-range k)]
-             [sol (in-stream s)])
-    sol))
 
 (struct bfs-queue (in out)
   #:methods gen:queue
@@ -96,19 +92,25 @@
      (dfs-queue (append v (dfs-queue-in q))))])
 (define (dfs v) (dfs-queue (list v)))
 
+(define (stream-take k s)
+  (for/list ([i (in-range k)] [sol (in-stream s)])
+    sol))
 (define (solve p #:k [k +inf.0] #:mode [mode bfs])
   (stream-take k (sols (mode (st p (kont:return))))))
 
 (define-syntax (ndo stx)
   (syntax-parse stx
-    [(_) (syntax/loc stx (fail))]
-    [(_ p) #'p]
-    [(_ [pat:expr x] . more)
+    [(_) (syntax/loc stx fail)]
+    [(_ p)
+     #:declare p (expr/c #'nd? #:name "non-det problem")
+     #'p.c]
+    [(_ [pat:expr p] . more)
+     #:declare p (expr/c #'nd? #:name "non-det problem")
      (syntax/loc stx
-       (bind x (match-lambda [pat (ndo . more)])))]))
+       (bind p.c (match-lambda [pat (ndo . more)])))]))
 
 (define (choice . l)
-  (for/fold ([p (fail)]) ([sp (in-list l)])
+  (for/fold ([p fail]) ([sp (in-list l)])
     (*par p sp)))
 
 (define (ans* v)
@@ -120,16 +122,19 @@
 ;; XXX Implement some sort of `memo` operation that will safe work
 ;; that appears in multiple places in the search space.
 
-;; XXX Write tests and contracts
+;; XXX Write tests
+
+;; XXX compile *log to this
 
 (provide
- solve
- nd?
- fail
  ndo
- choice
- ans*
- ans
- queue?
- bfs
- dfs)
+ (contract-out
+  [nd? (-> any/c boolean?)]
+  [fail nd?]
+  [choice (->* () #:rest (listof nd?) nd?)]
+  [ans* (-> (or/c list? sequence? stream?) nd?)]
+  [ans (-> any/c nd?)]
+  [queue? (-> any/c boolean?)]
+  [bfs (-> any/c queue?)]
+  [dfs (-> any/c queue?)]
+  [solve (->* (nd?) (#:k real? #:mode (-> any/c queue?)) list?)]))
