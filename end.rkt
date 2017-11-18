@@ -22,100 +22,68 @@
 
 (struct state (p kont))
 
-(struct step:next-state (st:in st:out))
-(struct step:work1 (st:in st:out p))
-(struct step:solution (a k))
-(struct step:done ())
-
-;; XXX rewrite as a lazy stream?
-(define step
-  (match-lambda
-    ;; Implement a queue of problems --- and thus run with BFS ---
-    ;; although we could instead use a functional priority queue and
-    ;; get either DFS or something like A* if we could inspect the
-    ;; states and make some decision.
-    [(step:next-state in out)
-     (match in
-       [(cons next in)
-        (step:work1 in out next)]
-       ['()
-        (cond
-          [(empty? out)
-           (step:done)]
-          [else
-           (step:next-state (reverse out) empty)])])]
-    ;; Do one unit of work for this problem
-    [(step:work1 st:in st:out (state p k))
+;; Implement a queue of problems --- and thus run with BFS ---
+;; although we could instead use a functional priority queue and
+;; get either DFS or something like A* if we could inspect the
+;; states and make some decision.
+(define (solutions st:in st:out)
+  (match st:in
+    [(cons (state p k) st:in)
      (match p
        ;; Do one step of work...
        [(bind x mx)
-        (step:next-state st:in (list* (state x (kont:bind mx k)) st:out))]
+        (solutions st:in (list* (state x (kont:bind mx k)) st:out))]
        [(seq s)
         ;; xxx if it is inf, then put a par at the end? so we do
         ;; something like DFS --- maybe this is stupid.
         (cond
           [(stream-empty? s)
-           (step:next-state st:in (list* (state (fail) k) st:out))]
+           (solutions st:in (list* (state (fail) k) st:out))]
           [else
-           (step:next-state st:in (list* (state (*par (ans (stream-first s))
-                                                      (seq (stream-rest s)))
-                                                k)
-                                         st:out))])]
+           (solutions st:in (list* (state (*par (ans (stream-first s))
+                                                (seq (stream-rest s)))
+                                          k)
+                                   st:out))])]
        [(*par x y)
-        (step:next-state st:in (list* (state x (kont:par y k)) st:out))]
+        (solutions st:in (list* (state x (kont:par y k)) st:out))]
        ;; ...And when it ends in a result...
        [(fail)
         (match k
           ;; If it goes to a par, then ignore and choose the other
           [(kont:par y k)
-           (step:next-state st:in (list* (state y k) st:out))]
+           (solutions st:in (list* (state y k) st:out))]
           ;; If it goes to a bind, then ignore mx and fall to k
           [(kont:bind mx k)
-           (step:next-state st:in (list* (state p k) st:out))]
+           (solutions st:in (list* (state p k) st:out))]
           ;; If it goes to a return, then throw away the state
           [(kont:return)
-           (step:next-state st:in st:out)])]
+           (solutions st:in st:out)])]
        [(ans a)
         (match k
           ;; When an answer goes to a par, fork the state and
           ;; duplicate the continuation
           [(kont:par y k)
-           (step:next-state st:in (list* (state p k) (state y k) st:out))]
+           (solutions st:in (list* (state p k) (state y k) st:out))]
           ;; Call the function on a bind
           [(kont:bind mx k)
-           (step:next-state st:in (list* (state (mx a) k) st:out))]
+           (solutions st:in (list* (state (mx a) k) st:out))]
           ;; We found a solution!
           [(kont:return)
-           (step:solution a (step:next-state st:in st:out))])])]
-    ;; When a solution is stepped, move on
-    [(step:solution _ k) k]
-    ;; When done, fix
-    [(? step:done? s) s]))
+           (stream-cons a (solutions st:in st:out))])])]
+    ['()
+     (cond
+       [(empty? st:out)
+        empty-stream]
+       [else
+        (solutions (reverse st:out) empty)])]))
 
-(define (query-done? q)
-  (or (step:done? q)))
-(define (query-return? q)
-  (or (query-done? q)
-      (step:solution? q)))
-
-(define (solve1 q)
-  (define qp (step q))
-  (if (query-return? qp)
-    qp
-    (solve1 qp)))
-
-(define (solve/k k q)
-  (cond
-    [(zero? k)
-     empty]
-    [else
-     (define qp (solve1 q))
-     (if (query-done? qp)
-       empty
-       (cons (step:solution-a qp) (solve/k (sub1 k) qp)))]))
+(define (stream-take k s)
+  (for/list ([i (in-range k)]
+             [sol (in-stream s)])
+    sol))
 
 (define (solve p #:k [k +inf.0])
-  (solve/k k (step:next-state (list (state p (kont:return))) empty)))
+  (stream-take k (solutions (list (state p (kont:return))) empty)))
 
 ;;;; Library
 (define-syntax (ndo stx)
@@ -139,7 +107,7 @@
 ;; XXX Implement some sort of `memo` operation that will safe work
 ;; that appears in multiple places in the search space.
 
-;; XXX Write tests
+;; XXX Write tests and contracts
 
 (provide
  solve
