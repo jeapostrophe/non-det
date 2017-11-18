@@ -13,8 +13,8 @@
 (struct fail ())
 (struct bind (x mx))
 (struct *par (x y))
-(struct *ans1 (a))
-(struct *ans (inf? s))
+(struct ans (a))
+(struct seq (s))
 
 (struct kont:return ())
 (struct kont:bind (mx k))
@@ -50,15 +50,15 @@
        ;; Do one step of work...
        [(bind x mx)
         (step:next-state st:in (list* (state x (kont:bind mx k)) st:out))]
-       [(*ans inf? s)
+       [(seq s)
         ;; xxx if it is inf, then put a par at the end? so we do
         ;; something like DFS --- maybe this is stupid.
         (cond
           [(stream-empty? s)
            (step:next-state st:in (list* (state (fail) k) st:out))]
           [else
-           (step:next-state st:in (list* (state (par (*ans1 (stream-first s))
-                                                     (*ans inf? (stream-rest s)))
+           (step:next-state st:in (list* (state (*par (ans (stream-first s))
+                                                      (seq (stream-rest s)))
                                                 k)
                                          st:out))])]
        [(*par x y)
@@ -75,7 +75,7 @@
           ;; If it goes to a return, then throw away the state
           [(kont:return)
            (step:next-state st:in st:out)])]
-       [(*ans1 a)
+       [(ans a)
         (match k
           ;; When an answer goes to a par, fork the state and
           ;; duplicate the continuation
@@ -118,26 +118,23 @@
   (solve/k k (step:next-state (list (state p (kont:return))) empty)))
 
 ;;;; Library
-(define-syntax (mdo stx)
+(define-syntax (ndo stx)
   (syntax-parse stx
     [(_) (syntax/loc stx (fail))]
     [(_ p) #'p]
     [(_ [pat:expr x] . more)
      (syntax/loc stx
-       (bind x (match-lambda [pat (mdo . more)])))]))
+       (bind x (match-lambda [pat (ndo . more)])))]))
 
-;; XXX this is not a good name
-(define (par . l)
+(define (choice . l)
   (for/fold ([p (fail)]) ([sp (in-list l)])
     (*par p sp)))
 
-;; XXX rename to be shorter
-(define (answer-seq s) (*ans #f (sequence->stream s)))
-(define (answer-infseq s) (*ans #t (sequence->stream s)))
-(define-simple-macro (answers as:expr)
-  (answer-seq (in-list as)))
-(define-simple-macro (answer a:expr)
-  (*ans1 a))
+(define (ans* v)
+  (match v
+    [(? list?) (ans* (in-list v))]
+    [(? sequence?) (seq (sequence->stream v))]
+    [(? stream?) (seq v)]))
 
 ;; XXX Implement some sort of `memo` operation that will safe work
 ;; that appears in multiple places in the search space.
@@ -147,10 +144,7 @@
 (provide
  solve
  fail
- mdo
- bind ;; XXX >>=?
- par  ;; XXX mplus?
- answer-seq
- answer-infseq
- answers
- answer)
+ ndo
+ choice
+ ans*
+ ans)

@@ -25,22 +25,22 @@
 ;; Here we try to prove things directly... essentially this means
 ;; using the introduction rules.
 (define (prove-direct Γ P)
-  (par
+  (choice
    ;; First, try to use an assumption
    (match Γ
      [(list (== P))
-      (answer (Lid))]
+      (ans (Lid))]
      [_ (fail)])
    ;; Next, try to look at the goal and go prove it directly
    (match P
      [(tensor A B)
-      (mdo [(cons Γ Δ) (answers (partitions-of Γ))]
+      (ndo [(cons Γ Δ) (ans* (partitions-of Γ))]
            [A-pf (prove-direct Γ A)]
            [B-pf (prove-direct Δ B)]
-           (answer (TensorIntro Γ Δ A-pf B-pf)))]
+           (ans (TensorIntro Γ Δ A-pf B-pf)))]
      ;; XXX WithIntro --- obvious
 
-     ;; XXX XorIntro --- obvious, using par
+     ;; XXX XorIntro --- obvious, using choice
 
      ;; XXX LolliIntro --- must consider each place inside of Γ to insert A
 
@@ -51,9 +51,9 @@
 ;; want to go into infinite loops consider permutations over and
 ;; over again.
 (define (permute-then-prove Γ P)
-  (mdo [Γp (answer-seq (in-permutations Γ))]
+  (ndo [Γp (ans* (in-permutations Γ))]
        [pf (prove-direct Γp P)]
-       (answer (Exchange Γp pf))))
+       (ans (Exchange Γp pf))))
 ;; This strategy looks at the context and breaks everything up into
 ;; its constituent pieces. After we have all the pieces, then we
 ;; permute. Essentially, we are applying all of the elimination
@@ -62,8 +62,8 @@
   (match Γin
     ['() (permute-then-prove Γout P)]
     [(cons (tensor A B) Γin)
-     (mdo [pf (breakup-assumptions (list* A B Γin) Γout P)]
-          (answer (TensorElim A B pf)))]
+     (ndo [pf (breakup-assumptions (list* A B Γin) Γout P)]
+          (ans (TensorElim A B pf)))]
     ;; XXX WithElim --- This would provide two answers (so perhaps
     ;; we should sort these to the end so that they are split at the
     ;; end rather than early, but maybe it doesn't matter?)
