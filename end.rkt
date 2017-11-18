@@ -27,6 +27,7 @@
 (struct step:solution (a k))
 (struct step:done ())
 
+;; XXX rewrite as a lazy stream?
 (define step
   (match-lambda
     ;; Implement a queue of problems --- and thus run with BFS ---
@@ -125,10 +126,12 @@
      (syntax/loc stx
        (bind x (match-lambda [pat (mdo . more)])))]))
 
+;; XXX this is not a good name
 (define (par . l)
   (for/fold ([p (fail)]) ([sp (in-list l)])
     (*par p sp)))
 
+;; XXX rename to be shorter
 (define (answer-seq s) (*ans #f (sequence->stream s)))
 (define (answer-infseq s) (*ans #t (sequence->stream s)))
 (define-simple-macro (answers as:expr)
@@ -145,8 +148,8 @@
  solve
  fail
  mdo
- bind
- par
+ bind ;; XXX >>=?
+ par  ;; XXX mplus?
  answer-seq
  answer-infseq
  answers
