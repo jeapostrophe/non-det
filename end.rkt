@@ -11,13 +11,13 @@
 (struct *fail nd ())
 (define fail (*fail))
 (struct bind nd (x mx))
-(struct *par nd (x y))
+(struct *choice nd (x y))
 (struct ans nd (a))
 (struct seq nd (s))
 
 (struct kont:return ())
 (struct kont:bind (mx k))
-(struct kont:par (y k))
+(struct kont:choice (y k))
 
 (struct st (p kont))
 
@@ -33,18 +33,18 @@
      (match p
        ;; Do one step of work...
        [(bind x mx) (sols (enq q (st x (kont:bind mx k))))]
-       [(*par x y)  (sols (enq q (st x (kont:par y k))))]
+       [(*choice x y)  (sols (enq q (st x (kont:choice y k))))]
        [(seq s)
         (cond
           [(stream-empty? s)
            (sols (enq q (st fail k)))]
           [else
-           (sols (enq q (st (*par (ans (stream-first s)) (seq (stream-rest s))) k)))])]
+           (sols (enq q (st (*choice (ans (stream-first s)) (seq (stream-rest s))) k)))])]
        ;; ...And when it ends in a result...
        [(*fail)
         (match k
-          ;; If it goes to a par, then ignore and choose the other
-          [(kont:par y k)   (sols (enq q (st y k)))]
+          ;; If it goes to a choice, then ignore and choose the other
+          [(kont:choice y k)   (sols (enq q (st y k)))]
           ;; If it goes to a bind, then ignore mx and fall to k
           [(kont:bind mx k) (sols (enq q (st p k)))]
           ;; If it goes to a return, then throw away the st
@@ -53,7 +53,7 @@
        [(ans a)
         (match k
           ;; Fork the st and duplicate the continuation
-          [(kont:par y k)   (sols (enq q (st p k) (st y k)))]
+          [(kont:choice y k)   (sols (enq q (st p k) (st y k)))]
           ;; Call the function on a bind
           [(kont:bind mx k) (sols (enq q (st (mx a) k)))]
           ;; We found a solution!
@@ -111,7 +111,7 @@
 
 (define (choice . l)
   (for/fold ([p fail]) ([sp (in-list l)])
-    (*par p sp)))
+    (*choice p sp)))
 
 (define (ans* v)
   (match v
