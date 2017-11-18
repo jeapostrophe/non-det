@@ -7,73 +7,56 @@
          racket/generic
          syntax/parse/define)
 
-;; This implements a form of non-determinism that is similar
-;; syntactically to Racklog/etc but is written monadically and allows
-;; a breadth-first search approach
-
-(struct fail ())
-(struct bind (x mx))
-(struct *par (x y))
-(struct ans (a))
-(struct seq (s))
+(struct nd ())
+(struct fail nd ())
+(struct bind nd (x mx))
+(struct *par nd (x y))
+(struct ans nd (a))
+(struct seq nd (s))
 
 (struct kont:return ())
 (struct kont:bind (mx k))
 (struct kont:par (y k))
 
-(struct state (p kont))
+(struct st (p kont))
 
 (define-generics queue
   (qempty? queue)
   (qhead queue)
   (enq queue . v))
 
-;; Implement a queue of problems --- and thus run with BFS ---
-;; although we could instead use a functional priority queue and
-;; get either DFS or something like A* if we could inspect the
-;; states and make some decision.
-(define solutions
+(define sols
   (match-lambda
     [(? qempty?) empty-stream]
-    [(app qhead (cons (state p k) q))
+    [(app qhead (cons (st p k) q))
      (match p
        ;; Do one step of work...
-       [(bind x mx)
-        (solutions (enq q (state x (kont:bind mx k))))]
+       [(bind x mx) (sols (enq q (st x (kont:bind mx k))))]
+       [(*par x y)  (sols (enq q (st x (kont:par y k))))]
        [(seq s)
         (cond
           [(stream-empty? s)
-           (solutions (enq q (state (fail) k)))]
+           (sols (enq q (st (fail) k)))]
           [else
-           (solutions (enq q (state (*par (ans (stream-first s))
-                                          (seq (stream-rest s)))
-                                    k)))])]
-       [(*par x y)
-        (solutions (enq q (state x (kont:par y k))))]
+           (sols (enq q (st (*par (ans (stream-first s)) (seq (stream-rest s))) k)))])]
        ;; ...And when it ends in a result...
        [(fail)
         (match k
           ;; If it goes to a par, then ignore and choose the other
-          [(kont:par y k)
-           (solutions (enq q (state y k)))]
+          [(kont:par y k)   (sols (enq q (st y k)))]
           ;; If it goes to a bind, then ignore mx and fall to k
-          [(kont:bind mx k)
-           (solutions (enq q (state p k)))]
-          ;; If it goes to a return, then throw away the state
-          [(kont:return)
-           (solutions q)])]
+          [(kont:bind mx k) (sols (enq q (st p k)))]
+          ;; If it goes to a return, then throw away the st
+          [(kont:return)    (sols q)])]
+       ;; But if it is an answer...
        [(ans a)
         (match k
-          ;; When an answer goes to a par, fork the state and
-          ;; duplicate the continuation
-          [(kont:par y k)
-           (solutions (enq q (state p k) (state y k)))]
+          ;; Fork the st and duplicate the continuation
+          [(kont:par y k)   (sols (enq q (st p k) (st y k)))]
           ;; Call the function on a bind
-          [(kont:bind mx k)
-           (solutions (enq q (state (mx a) k)))]
+          [(kont:bind mx k) (sols (enq q (st (mx a) k)))]
           ;; We found a solution!
-          [(kont:return)
-           (stream-cons a (solutions q))])])]))
+          [(kont:return)    (stream-cons a (sols q))])])]))
 
 (define (stream-take k s)
   (for/list ([i (in-range k)]
@@ -97,12 +80,25 @@
    (define (enq q . v)
      (match-define (bfs-queue in out) q)
      (bfs-queue in (append v out)))])
-(define (bfs . in) (bfs-queue in empty))
+(define (bfs v) (bfs-queue (list v) empty))
 
-(define (solve p #:k [k +inf.0])
-  (stream-take k (solutions (bfs (state p (kont:return))))))
+(struct dfs-queue (in)
+  #:methods gen:queue
+  [(define (qempty? q)
+     (empty? (dfs-queue-in q)))
+   (define (qhead q)
+     (match (dfs-queue-in q)
+       [(cons v in)
+        (cons v (dfs-queue in))]
+       ['()
+        (error 'qhead "Queue is empty")]))
+   (define (enq q . v)
+     (dfs-queue (append v (dfs-queue-in q))))])
+(define (dfs v) (dfs-queue (list v)))
 
-;;;; Library
+(define (solve p #:k [k +inf.0] #:mode [mode bfs])
+  (stream-take k (sols (mode (st p (kont:return))))))
+
 (define-syntax (ndo stx)
   (syntax-parse stx
     [(_) (syntax/loc stx (fail))]
@@ -128,8 +124,12 @@
 
 (provide
  solve
+ nd?
  fail
  ndo
  choice
  ans*
- ans)
+ ans
+ queue?
+ bfs
+ dfs)
