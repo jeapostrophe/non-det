@@ -76,7 +76,7 @@
    (define (enq q . v)
      (match-define (bfs-queue in out) q)
      (bfs-queue in (append v out)))])
-(define (bfs v) (bfs-queue (list v) empty))
+(define bfs (bfs-queue empty empty))
 
 (struct dfs-queue (in)
   #:methods gen:queue
@@ -90,13 +90,13 @@
         (error 'qhead "Queue is empty")]))
    (define (enq q . v)
      (dfs-queue (append v (dfs-queue-in q))))])
-(define (dfs v) (dfs-queue (list v)))
+(define dfs (dfs-queue empty))
 
 (define (stream-take k s)
   (for/list ([i (in-range k)] [sol (in-stream s)])
     sol))
 (define (solve p #:k [k +inf.0] #:mode [mode bfs])
-  (stream-take k (sols (mode (st p (kont:return))))))
+  (stream-take k (sols (enq mode (st p (kont:return))))))
 
 (define-syntax (ndo stx)
   (syntax-parse stx
@@ -135,6 +135,6 @@
   [ans* (-> (or/c list? sequence? stream?) nd?)]
   [ans (-> any/c nd?)]
   [queue? (-> any/c boolean?)]
-  [bfs (-> any/c queue?)]
-  [dfs (-> any/c queue?)]
-  [solve (->* (nd?) (#:k real? #:mode (-> any/c queue?)) list?)]))
+  [bfs queue?]
+  [dfs queue?]
+  [solve (->* (nd?) (#:k real? #:mode queue?) list?)]))
