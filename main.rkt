@@ -122,7 +122,7 @@
     [(? sequence?) (seq (sequence->stream v))]
     [(? stream?) (seq v)]))
 
-;; XXX Implement some sort of `memo` operation that will safe work
+;; XXX Implement some sort of `memo` operation that will save work
 ;; that appears in multiple places in the search space.
 
 ;; XXX Write tests
