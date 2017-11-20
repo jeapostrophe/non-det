@@ -14,6 +14,7 @@
 (struct *choice nd (x y))
 (struct ans nd (a))
 (struct seq nd (s))
+(struct once nd (x))
 
 (define-generics non-det
   (non-det-prob non-det)
@@ -22,13 +23,23 @@
 (struct kont:return ())
 (struct kont:bind (mx k))
 (struct kont:choice (y k))
+(struct kont:once (t k))
+
+(define (tag-in-kont? T k)
+  (match k
+    [(kont:return) #f]
+    [(kont:bind _ k) (tag-in-kont? T k)]
+    [(kont:choice y k) (tag-in-kont? T k)]
+    [(kont:once (== T) k) #t]
+    [(kont:once _ k) (tag-in-kont? T k)]))
 
 (struct st (p kont))
 
 (define-generics ndq
   (qempty? ndq)
   (qhead ndq)
-  (enq ndq . v))
+  (enq ndq . v)
+  (qfilter ndq ?))
 
 (define sols
   (match-lambda
@@ -38,6 +49,7 @@
        ;; Do one step of work...
        [(bind x mx)   (sols (enq q (st x (kont:bind mx k))))]
        [(*choice x y) (sols (enq q (st x (kont:choice y k))))]
+       [(once x) (sols (enq q (st x (kont:once (gensym 'once) k))))]
        [(seq s)
         (cond
           [(stream-empty? s)
@@ -50,20 +62,25 @@
         (match k
           ;; Ignore and choose the other
           [(kont:choice y k) (sols (enq q (st y k)))]
-          ;; Ignore mx and fall to k
-          [(kont:bind mx k)  (sols (enq q (st p k)))]
+          ;; Pass through bind and once
+          [(or (kont:bind _ k) (kont:once _ k))
+           (sols (enq q (st p k)))]
           ;; Throw away the st
           [(kont:return)     (sols q)])]
        [(ans a)
         (match k
+          ;; Once should go kill off this tag in other places in the queue
+          [(kont:once t k)
+           (define qp (qfilter q (match-lambda [(st _ k) (not (tag-in-kont? t k))])))
+           (sols (enq qp (st p k)))]
           ;; Fork the st and duplicate the continuation
           [(kont:choice y k) (sols (enq q (st p k) (st y k)))]
           ;; Call the function on a bind
           [(kont:bind mx k)  (sols (enq q (st (mx a) k)))]
           ;; We found a solution!
           [(kont:return)     (stream-cons a (sols q))])]
-       [(? non-det?)
-        (sols (enq q (non-det-prob p)))])]))
+       [(and (? non-det?) (not (? nd?)))
+        (sols (enq q (st (non-det-prob p) k)))])]))
 
 (struct bfs-ndq (in out)
   #:methods gen:ndq
@@ -81,7 +98,10 @@
           (qhead (bfs-ndq (reverse out) empty)))]))
    (define (enq q . v)
      (match-define (bfs-ndq in out) q)
-     (bfs-ndq in (append v out)))])
+     (bfs-ndq in (append v out)))
+   (define (qfilter q ?)
+     (match-define (bfs-ndq in out) q)
+     (bfs-ndq (filter ? in) (filter ? out)))])
 (define bfs (bfs-ndq empty empty))
 
 (struct dfs-ndq (in)
@@ -96,7 +116,9 @@
        ['()
         (error 'qhead "Non-det Queue is empty")]))
    (define (enq q . v)
-     (dfs-ndq (append v (dfs-ndq-in q))))])
+     (dfs-ndq (append v (dfs-ndq-in q))))
+   (define (qfilter q ?)
+     (dfs-ndq (filter ? (dfs-ndq-in q))))])
 (define dfs (dfs-ndq empty))
 
 (define (mode->ndq m)
@@ -134,10 +156,6 @@
 ;; XXX Implement some sort of `memo` operation that will save work
 ;; that appears in multiple places in the search space.
 
-;; XXX Add once which calls solve inside of a problem to introduce a
-;; cut point. (or does something else, because that is necessarily
-;; DFS)
-
 ;; XXX Write tests & docs
 
 (provide
@@ -147,6 +165,7 @@
   [non-det-prob (-> non-det? non-det?)]
   [fail non-det?]
   [choice (->* () #:rest (listof non-det?) non-det?)]
+  [once (-> non-det? non-det?)]
   [ans* (-> (or/c list? sequence? stream?) non-det?)]
   [ans (-> any/c non-det?)]
   [solve (->* (non-det?) (#:k real? #:mode (or/c 'bfs 'dfs)) list?)]))

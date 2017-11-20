@@ -83,7 +83,9 @@
 (module+ test
   (define A (const 'A))
   (define B (const 'B))
-  (solve #:mode 'dfs #:k 1 (proves-top (list A) A))
-  (solve #:k 1 (proves-top (list A B) (tensor A B)))
-  (solve #:k 1 (proves-top (list A B) (tensor B A)))
-  (solve #:k 1 (proves-top (list (tensor A B)) (tensor B A))))
+  (solve #:mode 'dfs (proves-top (list A) A))
+  (solve (proves-top (list A B) (tensor A B)))
+  (solve (proves-top (list A B) (tensor B A)))
+  (solve (proves-top (list (tensor A B)) (tensor B A)))
+  (solve (proves-top (list A A) (tensor A A)))
+  (solve (proves-top (list A A A) (tensor A (tensor A A)))))
