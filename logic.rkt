@@ -87,8 +87,7 @@
     #:description "relation rule"
     #:attributes (defn matcher)
     #:literals (rule)
-    (pattern (rule (rname:id v:id ...)
-                   (cname:id h:expr ...) #:=> body ...)
+    (pattern (rule (rname:id v:id ...) head:expr #:=> body ...)
              #:declare body (expr/c #'(-> hash? non-det?) #:name "non-det problem")
              #:with (body-id ...)
              (for/list ([i (in-naturals)]
@@ -110,8 +109,7 @@
              (syntax/loc this-syntax
                (λ (env a-conc)
                  (with-vars (v ...)
-                   ;; XXX This 'cname should be different and not guessable.
-                   (ndo [new-env (unify env a-conc (list 'cname h ...))]
+                   (ndo [new-env (unify env a-conc head)]
                         [(log-res new-env body-id) (body.c new-env)]
                         ...
                         (ans (log-res new-env (rname v ... body-id ...))))))))))
@@ -119,15 +117,21 @@
 (define-syntax (define-relation stx)
   (syntax-parse stx
     [(_ (cname:id v:id ...) r:relation-rule ...)
-     (syntax/loc stx
-       (begin
-         r.defn ...
-         (define (cname v ...)
-           ;; XXX This 'cname should be different and not guessable.
-           (define a-conc (list 'cname v ...))
-           (procedure-rename
-            (λ (env) (choice (r.matcher env a-conc) ...))
-            'cname))))]))
+     (with-syntax ([cname? (format-id #'cname "~a?" #'cname)])
+       (syntax/loc stx
+         (begin
+           r.defn ...
+           (struct cname (v ...)
+             #:transparent
+             #:methods gen:unifiable
+             [(define (unifiable-pred u) cname?)
+              (define (unifiable-out u)
+                (match-define (cname v ...) u)
+                (list v ...))
+              (define (unifiable-in u l)
+                (apply cname l))]
+             #:property prop:procedure
+             (λ (a-conc env) (choice (r.matcher env a-conc) ...))))))]))
 
 (define (extract-vars env vs)
   (for/hasheq ([k (in-list vs)])

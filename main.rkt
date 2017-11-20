@@ -7,14 +7,17 @@
          racket/contract
          racket/generic)
 
-(struct non-det ())
-(struct *fail non-det ())
+(struct nd ())
+(struct *fail nd ())
 (define fail (*fail))
-(struct bind non-det (x mx))
-(struct *choice non-det (x y))
-(struct ans non-det (a))
-(struct seq non-det (s))
-;; XXX Add a non-det generic
+(struct bind nd (x mx))
+(struct *choice nd (x y))
+(struct ans nd (a))
+(struct seq nd (s))
+
+(define-generics non-det
+  (non-det-prob non-det)
+  #:fast-defaults ([nd? (define (non-det-prob n) n)]))
 
 (struct kont:return ())
 (struct kont:bind (mx k))
@@ -43,16 +46,14 @@
            (sols (enq q (st (*choice (ans (stream-first s))
                                      (seq (stream-rest s)))
                             k)))])]
-       ;; ...And when it ends in a result...
        [(*fail)
         (match k
-          ;; If it goes to a choice, then ignore and choose the other
+          ;; Ignore and choose the other
           [(kont:choice y k) (sols (enq q (st y k)))]
-          ;; If it goes to a bind, then ignore mx and fall to k
+          ;; Ignore mx and fall to k
           [(kont:bind mx k)  (sols (enq q (st p k)))]
-          ;; If it goes to a return, then throw away the st
+          ;; Throw away the st
           [(kont:return)     (sols q)])]
-       ;; But if it is an answer...
        [(ans a)
         (match k
           ;; Fork the st and duplicate the continuation
@@ -60,7 +61,9 @@
           ;; Call the function on a bind
           [(kont:bind mx k)  (sols (enq q (st (mx a) k)))]
           ;; We found a solution!
-          [(kont:return)     (stream-cons a (sols q))])])]))
+          [(kont:return)     (stream-cons a (sols q))])]
+       [(? non-det?)
+        (sols (enq q (non-det-prob p)))])]))
 
 (struct bfs-ndq (in out)
   #:methods gen:ndq
@@ -101,7 +104,6 @@
     ['bfs bfs]
     ['dfs dfs]))
 
-;; XXX add to racket/stream
 (define (stream-take k s)
   (for/list ([i (in-range k)] [sol (in-stream s)])
     sol))
@@ -139,9 +141,10 @@
 ;; XXX Write tests & docs
 
 (provide
- ndo
+ ndo gen:non-det
  (contract-out
   [non-det? (-> any/c boolean?)]
+  [non-det-prob (-> non-det? non-det?)]
   [fail non-det?]
   [choice (->* () #:rest (listof non-det?) non-det?)]
   [ans* (-> (or/c list? sequence? stream?) non-det?)]
