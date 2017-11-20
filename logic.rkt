@@ -89,7 +89,7 @@
     #:literals (rule)
     (pattern (rule (rname:id v:id ...)
                    (cname:id h:expr ...) #:=> body ...)
-             #:declare body (expr/c #'(-> hash? nd?) #:name "non-det problem")
+             #:declare body (expr/c #'(-> hash? non-det?) #:name "non-det problem")
              #:with (body-id ...)
              (for/list ([i (in-naturals)]
                         [b (in-list (syntax->list #'(body ...)))])
@@ -110,6 +110,7 @@
              (syntax/loc this-syntax
                (λ (env a-conc)
                  (with-vars (v ...)
+                   ;; XXX This 'cname should be different and not guessable.
                    (ndo [new-env (unify env a-conc (list 'cname h ...))]
                         [(log-res new-env body-id) (body.c new-env)]
                         ...
@@ -122,6 +123,7 @@
        (begin
          r.defn ...
          (define (cname v ...)
+           ;; XXX This 'cname should be different and not guessable.
            (define a-conc (list 'cname v ...))
            (procedure-rename
             (λ (env) (choice (r.matcher env a-conc) ...))
@@ -135,7 +137,7 @@
   (let ([v (var 'v)] ...) . body))
 
 (define-simple-macro (lsolve (v:id ...) arg ... an-nd)
-  #:declare an-nd (expr/c #'(-> hash? nd?) #:name "non-det problem")
+  #:declare an-nd (expr/c #'(-> hash? non-det?) #:name "non-det problem")
   (with-vars (v ...)
     (solve arg ...
            (ndo [(log-res env pf) (an-nd.c (hasheq))]
@@ -157,7 +159,7 @@
   (rule (R:==-refl X)
         (:== X X) #:=>))
 
-;; XXX Make this right
+;; XXX Define interface
 (provide (all-defined-out))
 
 ;; Tests
@@ -235,7 +237,7 @@
             (:proves In (list 'tensor A B) Tmp)
             (:proves (list* A B Tmp) C Out)))
 
-    (lsolve () #:k 1 #:mode dfs (:proves '(A) 'A '()))
+    (lsolve () #:k 1 #:mode 'dfs (:proves '(A) 'A '()))
     (lsolve () #:k 1 (:proves '(A B) '(tensor A B) '()))
     (lsolve () #:k 1 (:proves '(B A) '(tensor A B) '()))
     (lsolve () #:k 1 (:proves '((tensor A B)) '(tensor B A) '()))))
