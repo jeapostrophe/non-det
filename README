@@ -1,3 +1,3 @@
-rclp - Racket(CLP)
+non-det - Racket non-determinism
 
-A constraint logic programming language for Racket
+Tools for using non-determinism efficiently in Racket

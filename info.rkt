@@ -1,5 +1,5 @@
 #lang info
-(define collection "rclp")
+(define collection "non-det")
 (define deps '("chk-lib" "base"))
 (define build-deps '())
 (define scribblings '())

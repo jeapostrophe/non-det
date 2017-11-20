@@ -11,7 +11,7 @@
          racket/list
          racket/pretty
          racket/contract
-         rclp)
+         non-det)
 
 ;; Unification
 (struct var (id) #:transparent)
