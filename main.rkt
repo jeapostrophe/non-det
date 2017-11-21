@@ -41,7 +41,7 @@
     [(kont:return) #f]
     [(kont:bind _ k) (occurs-in-kont? T k)]
     [(kont:once _ k) (occurs-in-kont? T k)]
-    [(kont:choice y k) (occurs-in-kont? T k)]
+    [(kont:choice _ k) (occurs-in-kont? T k)]
     [(kont:occurs (== T) k) #t]
     [(kont:occurs _ k) (occurs-in-kont? T k)]))
 
@@ -87,7 +87,7 @@
           [(or (kont:bind _ k) (kont:once _ k) (kont:occurs _ k))
            (sols (enq q (st p k)))]
           ;; Throw away the st
-          [(kont:return)     (sols q)])]
+          [(kont:return) (sols q)])]
        [(ans a)
         (match k
           ;; Skip over occurs
