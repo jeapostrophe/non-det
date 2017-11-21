@@ -15,6 +15,7 @@
 (struct ans nd (a))
 (struct seq nd (s))
 (struct once nd (x))
+(struct occurs nd (t x))
 
 (define-generics non-det
   (non-det-prob non-det)
@@ -24,14 +25,25 @@
 (struct kont:bind (mx k))
 (struct kont:choice (y k))
 (struct kont:once (t k))
+(struct kont:occurs (t k))
 
-(define (tag-in-kont? T k)
+(define (once-in-kont? T k)
   (match k
     [(kont:return) #f]
-    [(kont:bind _ k) (tag-in-kont? T k)]
-    [(kont:choice y k) (tag-in-kont? T k)]
+    [(kont:bind _ k) (once-in-kont? T k)]
+    [(kont:occurs _ k) (once-in-kont? T k)]
+    [(kont:choice y k) (once-in-kont? T k)]
     [(kont:once (== T) k) #t]
-    [(kont:once _ k) (tag-in-kont? T k)]))
+    [(kont:once _ k) (once-in-kont? T k)]))
+
+(define (occurs-in-kont? T k)
+  (match k
+    [(kont:return) #f]
+    [(kont:bind _ k) (occurs-in-kont? T k)]
+    [(kont:once _ k) (occurs-in-kont? T k)]
+    [(kont:choice y k) (occurs-in-kont? T k)]
+    [(kont:occurs (== T) k) #t]
+    [(kont:occurs _ k) (occurs-in-kont? T k)]))
 
 (struct st (p kont))
 
@@ -50,6 +62,14 @@
        [(bind x mx)   (sols (enq q (st x (kont:bind mx k))))]
        [(*choice x y) (sols (enq q (st x (kont:choice y k))))]
        [(once x) (sols (enq q (st x (kont:once (gensym 'once) k))))]
+       [(occurs t x)
+        (cond
+          ;; If the occurs is already in the continuation, then fail
+          [(occurs-in-kont? t k)
+           (sols (enq q (st fail k)))]
+          ;; Otherwise, record this is in the kont
+          [else
+           (sols (enq q (st x (kont:occurs t k))))])]
        [(seq s)
         (cond
           [(stream-empty? s)
@@ -61,17 +81,21 @@
        [(*fail)
         (match k
           ;; Ignore and choose the other
-          [(kont:choice y k) (sols (enq q (st y k)))]
-          ;; Pass through bind and once
-          [(or (kont:bind _ k) (kont:once _ k))
+          [(kont:choice y k)
+           (sols (enq q (st y k)))]
+          ;; Pass through bind, once, and occurs
+          [(or (kont:bind _ k) (kont:once _ k) (kont:occurs _ k))
            (sols (enq q (st p k)))]
           ;; Throw away the st
           [(kont:return)     (sols q)])]
        [(ans a)
         (match k
+          ;; Skip over occurs
+          [(kont:occurs _ k)
+           (sols (enq q (st p k)))]
           ;; Once should go kill off this tag in other places in the queue
           [(kont:once t k)
-           (define qp (qfilter q (match-lambda [(st _ k) (not (tag-in-kont? t k))])))
+           (define qp (qfilter q (match-lambda [(st _ k) (not (once-in-kont? t k))])))
            (sols (enq qp (st p k)))]
           ;; Fork the st and duplicate the continuation
           [(kont:choice y k) (sols (enq q (st p k) (st y k)))]
@@ -166,6 +190,7 @@
   [fail non-det?]
   [choice (->* () #:rest (listof non-det?) non-det?)]
   [once (-> non-det? non-det?)]
+  [occurs (-> any/c non-det? non-det?)]
   [ans* (-> (or/c list? sequence? stream?) non-det?)]
   [ans (-> any/c non-det?)]
   [solve (->* (non-det?) (#:k real? #:mode (or/c 'bfs 'dfs)) list?)]))
