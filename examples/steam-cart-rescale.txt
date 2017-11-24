@@ -1,0 +1,140 @@
+[A] Total War: WARHAMMER vs [D] Toukiden: Kiwami? a
+[A] Tales of Berseria vs [D] Toukiden: Kiwami? a
+[A] Tales of Berseria vs [D] Total War: WARHAMMER? a
+[A] Hearts of Iron IV: Cadet Edition vs [D] Toukiden: Kiwami? a
+[A] Hearts of Iron IV: Cadet Edition vs [D] Total War: WARHAMMER? a
+[A] Hearts of Iron IV: Cadet Edition vs [D] Tales of Berseria? d
+[A] DiRT Rally vs [D] Toukiden: Kiwami? a
+[A] DiRT Rally vs [D] Total War: WARHAMMER? a
+[A] DiRT Rally vs [D] Tales of Berseria? d
+[A] DiRT Rally vs [D] Hearts of Iron IV: Cadet Edition? d
+[A] Distance vs [D] Toukiden: Kiwami? a
+[A] Distance vs [D] Total War: WARHAMMER? a
+[A] Distance vs [D] Tales of Berseria? d
+[A] Distance vs [D] Hearts of Iron IV: Cadet Edition? d
+[A] Distance vs [D] DiRT Rally? a
+[A] Darkest Dungeon vs [D] Toukiden: Kiwami? d
+[A] Crusader Kings II vs [D] Toukiden: Kiwami? a
+[A] Crusader Kings II vs [D] Total War: WARHAMMER? a
+[A] Crusader Kings II vs [D] Tales of Berseria? d
+[A] Crusader Kings II vs [D] Hearts of Iron IV: Cadet Edition? a
+[A] Europa Universalis IV vs [D] Toukiden: Kiwami? d
+[A] Europa Universalis IV vs [D] Darkest Dungeon? a
+[A] BLUE REVOLVER vs [D] Toukiden: Kiwami? a
+[A] BLUE REVOLVER vs [D] Total War: WARHAMMER? a
+[A] BLUE REVOLVER vs [D] Tales of Berseria? d
+[A] BLUE REVOLVER vs [D] Hearts of Iron IV: Cadet Edition? a
+[A] BLUE REVOLVER vs [D] Crusader Kings II? a
+[A] Graze Counter vs [D] Toukiden: Kiwami? a
+[A] Graze Counter vs [D] Total War: WARHAMMER? a
+[A] Graze Counter vs [D] Tales of Berseria? d
+[A] Graze Counter vs [D] Hearts of Iron IV: Cadet Edition? a
+[A] Graze Counter vs [D] Crusader Kings II? a
+[A] Graze Counter vs [D] BLUE REVOLVER? d
+[A] Omega Strike vs [D] Toukiden: Kiwami? a
+[A] Omega Strike vs [D] Total War: WARHAMMER? a
+[A] Omega Strike vs [D] Tales of Berseria? d
+[A] Omega Strike vs [D] Hearts of Iron IV: Cadet Edition? d
+[A] Omega Strike vs [D] DiRT Rally? d
+[A] Steredenn vs [D] Toukiden: Kiwami? d
+[A] Steredenn vs [D] Darkest Dungeon? a
+[A] Steredenn vs [D] Europa Universalis IV? d
+[A] Assault Android Cactus vs [D] Toukiden: Kiwami? a
+[A] Assault Android Cactus vs [D] Total War: WARHAMMER? a
+[A] Assault Android Cactus vs [D] Tales of Berseria? d
+[A] Assault Android Cactus vs [D] Hearts of Iron IV: Cadet Edition? d
+[A] Assault Android Cactus vs [D] DiRT Rally? d
+[A] Assault Android Cactus vs [D] Omega Strike? a
+[A] Cosmic Star Heroine vs [D] Toukiden: Kiwami? a
+[A] Cosmic Star Heroine vs [D] Total War: WARHAMMER? d
+[A] A Robot Named Fight vs [D] Toukiden: Kiwami? d
+[A] A Robot Named Fight vs [D] Darkest Dungeon? a
+[A] A Robot Named Fight vs [D] Europa Universalis IV? d
+[A] A Robot Named Fight vs [D] Steredenn? d
+[A] Cryptark vs [D] Toukiden: Kiwami? a
+[A] Cryptark vs [D] Total War: WARHAMMER? a
+[A] Cryptark vs [D] Tales of Berseria? d
+[A] Cryptark vs [D] Hearts of Iron IV: Cadet Edition? a
+[A] Cryptark vs [D] Crusader Kings II? a
+[A] Cryptark vs [D] BLUE REVOLVER? d
+[A] Cryptark vs [D] Graze Counter? d
+[A] Burnout Paradise: The Ultimate Box vs [D] Toukiden: Kiwami? a
+[A] Burnout Paradise: The Ultimate Box vs [D] Total War: WARHAMMER? a
+[A] Burnout Paradise: The Ultimate Box vs [D] Tales of Berseria? a
+[A] Mass Effect 2 vs [D] Toukiden: Kiwami? d
+[A] Mass Effect 2 vs [D] Darkest Dungeon? d
+[A] Danmaku Unlimited 3 vs [D] Toukiden: Kiwami? d
+[A] Danmaku Unlimited 3 vs [D] Darkest Dungeon? a
+[A] Danmaku Unlimited 3 vs [D] Europa Universalis IV? d
+[A] Danmaku Unlimited 3 vs [D] Steredenn? a
+[A] Cladun X2 vs [D] Toukiden: Kiwami? a
+[A] Cladun X2 vs [D] Total War: WARHAMMER? a
+[A] Cladun X2 vs [D] Tales of Berseria? a
+[A] Cladun X2 vs [D] Burnout Paradise: The Ultimate Box? a
+[A] Don't Starve vs [D] Toukiden: Kiwami? d
+[A] Don't Starve vs [D] Darkest Dungeon? d
+[A] Don't Starve vs [D] Mass Effect 2? d
+[A] Hacknet vs [D] Toukiden: Kiwami? a
+[A] Hacknet vs [D] Total War: WARHAMMER? a
+[A] Hacknet vs [D] Tales of Berseria? a
+[A] Hacknet vs [D] Burnout Paradise: The Ultimate Box? d
+[A] Crypt of the NecroDancer vs [D] Toukiden: Kiwami? d
+[A] Crypt of the NecroDancer vs [D] Darkest Dungeon? a
+[A] Crypt of the NecroDancer vs [D] Europa Universalis IV? a
+[A] The eXceed Collection vs [D] Toukiden: Kiwami? d
+[A] The eXceed Collection vs [D] Darkest Dungeon? d
+[A] The eXceed Collection vs [D] Mass Effect 2? d
+[A] The eXceed Collection vs [D] Don't Starve? a
+[A] Half Minute Hero Bundle vs [D] Toukiden: Kiwami? a
+[A] Half Minute Hero Bundle vs [D] Total War: WARHAMMER? a
+[A] Half Minute Hero Bundle vs [D] Tales of Berseria? d
+[A] Half Minute Hero Bundle vs [D] Hearts of Iron IV: Cadet Edition? d
+[A] Half Minute Hero Bundle vs [D] DiRT Rally? d
+[A] Half Minute Hero Bundle vs [D] Omega Strike? a
+[A] Half Minute Hero Bundle vs [D] Assault Android Cactus? a
+[A] SteamWorld Dig vs [D] Toukiden: Kiwami? a
+[A] SteamWorld Dig vs [D] Total War: WARHAMMER? a
+[A] SteamWorld Dig vs [D] Tales of Berseria? d
+[A] SteamWorld Dig vs [D] Hearts of Iron IV: Cadet Edition? a
+[A] SteamWorld Dig vs [D] Crusader Kings II? a
+[A] SteamWorld Dig vs [D] BLUE REVOLVER? d
+[A] SteamWorld Dig vs [D] Graze Counter? d
+[A] SteamWorld Dig vs [D] Cryptark? a
+[A] Stealth Bastard Deluxe vs [D] Toukiden: Kiwami? a
+[A] Stealth Bastard Deluxe vs [D] Total War: WARHAMMER? d
+[A] Stealth Bastard Deluxe vs [D] Cosmic Star Heroine? d
+[A] ROCKETSROCKETSROCKETS vs [D] Toukiden: Kiwami? d
+[A] ROCKETSROCKETSROCKETS vs [D] Darkest Dungeon? d
+[A] ROCKETSROCKETSROCKETS vs [D] Mass Effect 2? d
+[A] ROCKETSROCKETSROCKETS vs [D] Don't Starve? a
+[A] ROCKETSROCKETSROCKETS vs [D] The eXceed Collection? d
+[A] RunGunJumpGun vs [D] Toukiden: Kiwami? d
+[A] RunGunJumpGun vs [D] Darkest Dungeon? a
+[A] RunGunJumpGun vs [D] Europa Universalis IV? a
+[A] RunGunJumpGun vs [D] Crypt of the NecroDancer? a
+[A] Gratuitous Space Battles vs [D] Toukiden: Kiwami? d
+[A] Gratuitous Space Battles vs [D] Darkest Dungeon? d
+[A] Gratuitous Space Battles vs [D] Mass Effect 2? a
+[A] Commander Keen Complete Pack vs [D] Toukiden: Kiwami? d
+[A] Commander Keen Complete Pack vs [D] Darkest Dungeon? d
+[A] Commander Keen Complete Pack vs [D] Mass Effect 2? d
+[A] Commander Keen Complete Pack vs [D] Don't Starve? d
+[A] Chip's Challenge 1 & 2 Bundle vs [D] Toukiden: Kiwami? a
+[A] Chip's Challenge 1 & 2 Bundle vs [D] Total War: WARHAMMER? d
+[A] Chip's Challenge 1 & 2 Bundle vs [D] Cosmic Star Heroine? d
+[A] Chip's Challenge 1 & 2 Bundle vs [D] Stealth Bastard Deluxe? a
+[A] Momodora III vs [D] Toukiden: Kiwami? a
+[A] Momodora III vs [D] Total War: WARHAMMER? d
+[A] Momodora III vs [D] Cosmic Star Heroine? d
+[A] Momodora III vs [D] Stealth Bastard Deluxe? a
+[A] Momodora III vs [D] Chip's Challenge 1 & 2 Bundle? a
+[A] Super Star Path vs [D] Toukiden: Kiwami? d
+[A] Super Star Path vs [D] Darkest Dungeon? a
+[A] Super Star Path vs [D] Europa Universalis IV? d
+[A] Super Star Path vs [D] Steredenn? a
+[A] Super Star Path vs [D] Danmaku Unlimited 3? d
+[A] Stardust Vanguards vs [D] Toukiden: Kiwami? d
+[A] Stardust Vanguards vs [D] Darkest Dungeon? a
+[A] Stardust Vanguards vs [D] Europa Universalis IV? d
+[A] Stardust Vanguards vs [D] Steredenn? a
+[A] Stardust Vanguards vs [D] Danmaku Unlimited 3? a
