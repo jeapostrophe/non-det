@@ -153,7 +153,7 @@
 (define (stream-take k s)
   (for/list ([i (in-range k)] [sol (in-stream s)])
     sol))
-(define (solve p #:k [k +inf.0] #:mode [m 'bfs])
+(define (nrun p #:k [k +inf.0] #:mode [m 'bfs])
   (stream-take k (sols (enq (mode->ndq m) (st p (kont:return))))))
 
 (define-syntax (ndo stx)
@@ -193,4 +193,4 @@
   [occurs (-> any/c non-det? non-det?)]
   [ans* (-> (or/c list? sequence? stream?) non-det?)]
   [ans (-> any/c non-det?)]
-  [solve (->* (non-det?) (#:k real? #:mode (or/c 'bfs 'dfs)) list?)]))
+  [nrun (->* (non-det?) (#:k real? #:mode (or/c 'bfs 'dfs)) list?)]))

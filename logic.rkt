@@ -143,7 +143,7 @@
 (define-simple-macro (lsolve (v:id ...) arg ... an-nd)
   #:declare an-nd (expr/c #'(-> hash? non-det?) #:name "non-det problem")
   (with-vars (v ...)
-    (solve arg ...
+    (nrun arg ...
            (ndo [(log-res env pf) (an-nd.c (hasheq))]
                 (ans (log-res (extract-vars env (list v ...))
                               (env-deref env pf)))))))
