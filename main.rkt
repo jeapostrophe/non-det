@@ -4,7 +4,7 @@
          racket/match
          racket/list
          racket/stream
-         racket/contract
+         racket/contract/base
          racket/generic)
 
 (struct nd ())
