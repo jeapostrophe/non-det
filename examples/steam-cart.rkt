@@ -18,12 +18,12 @@
 (module+ main
   ;; How much cash do you want to spend?
   (define BUDGET 100)
-  ;; Do you want to answer a questionaire first?
-  ;; $ cut -f 2 -d '?' FILE | 
-  (define RESCALE? #t)
   ;; Do you want to run the optimizer? (Takes about 15 seconds) Or
   ;; just use a heuristic?
   (define OPTIMIZE? #f))
+;; Do you want to answer a questionaire first?
+;; $ cut -f 2 -d '?' FILE | 
+(define RESCALE? #f)
 
 (define (group-in n l)
   (cond
@@ -32,8 +32,11 @@
      (define-values (one more) (split-at l n))
      (cons one (group-in n more))]))
 
-(define (->n s)
-  (/ (string->number (regexp-replace (regexp-quote ".") (substring s 1) "")) 100))
+(define (->n title s)
+  (define n (string->number (regexp-replace (regexp-quote ".") (substring s 1) "")))
+  (unless n
+    (error '->n "title: ~v n=~v" title s))
+  (/ n 100))
 
 (struct item (title actual original discounted) #:transparent)
 (define (item-surplus i)
@@ -48,7 +51,10 @@
 (define parse
   (match-lambda
     [(list original discount _ title)
-     (item title (->n original) #f (->n discount))]))
+     (define o (->n title original))
+     (item title o
+           (if RESCALE? #f o)
+           (->n title discount))]))
 
 (struct cart-state (heuristic? budget-left potential bought surplus surplus-bound))
 
@@ -204,10 +210,12 @@
   new-l)
 
 (module+ main
-  (require racket/runtime-path)
+  (require racket/runtime-path
+           racket/pretty)
   (define-runtime-path in "steam-cart.txt")
+  (define gs (group-in 4 (file->lines in)))
   (define the-cart
-    (map parse (group-in 4 (file->lines in))))
+    (map parse gs))
   (define rescaled-cart
     (if RESCALE?
       (rescale the-cart)
