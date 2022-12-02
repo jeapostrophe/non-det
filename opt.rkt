@@ -35,6 +35,7 @@
       (cond
         [solution
          (when (order score BEST-sc)
+           (eprintf "New best solution: ~a\n" score)
            (set! BEST c)
            (set! BEST-sc score))]
         [else
